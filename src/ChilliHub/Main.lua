@@ -15,6 +15,12 @@ return function(M)
 
     -- 1) Estado + serviços (sem dependências)
     local Ctx = {}
+    Ctx.BootTime = os.clock()
+    -- Escape hatch p/ diagnóstico: execute com
+    --   getgenv().CHILLI_SAFEBOOT = true
+    -- antes do loadstring e NADA automático liga
+    -- (sem hooks, sem loops). Tudo manual pela UI.
+    Ctx.SafeBoot = getgenv and getgenv().CHILLI_SAFEBOOT == true or false
     Ctx.Config = M.Config
     Ctx.State = M.Config.newState()
     Ctx.Services = M.Services()
@@ -47,11 +53,16 @@ return function(M)
     Ctx.Remotes.Refresh()
     Ctx.PlayerMods.start()
     Ctx.ESP.start()
-    Ctx.Automation.startAll()
+    if Ctx.SafeBoot then
+        U.Notify("Chilli Hub", "SAFEBOOT: automacao e bypass DESLIGADOS. Ligue manual.", 8)
+        print("[ChilliHub] SAFEBOOT ativo - nada automatico foi iniciado")
+    else
+        Ctx.Automation.startAll()
+        task.spawn(function()
+            if State.AntiKick then Ctx.AntiCheat.Setup() end
+        end)
+    end
     Ctx.AntiCheat.BindRespawn()
-    task.spawn(function()
-        if State.AntiKick then Ctx.AntiCheat.Setup() end
-    end)
 
     -- 6) UI (Orion primeiro, Nativa como fallback)
     Ctx.OrionUI = M.OrionUI(Ctx)

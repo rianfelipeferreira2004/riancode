@@ -48,7 +48,7 @@ return function(Ctx)
             Callback = function(v) State.AutoSnipe = v end })
         FarmTab:AddToggle({ Name = "Smart Tween + NoClip", Default = true, Save = true, Flag = "SmartTween",
             Callback = function(v) State.SmartTween = v end })
-        FarmTab:AddSlider({ Name = "Tween Speed", Min = 60, Max = 600, Default = 220, Color = Blue,
+        FarmTab:AddSlider({ Name = "Tween Speed", Min = 60, Max = 600, Default = 150, Color = Blue,
             Increment = 5, ValueName = "studs/s", Save = true, Flag = "TweenSpeed",
             Callback = function(v) State.TweenSpeed = v end })
         FarmTab:AddSlider({ Name = "Delay roubos", Min = 0.1, Max = 2, Default = 0.35, Color = Blue,

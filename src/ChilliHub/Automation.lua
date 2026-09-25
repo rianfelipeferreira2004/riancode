@@ -14,8 +14,30 @@ return function(Ctx)
 
     local A = {}
 
+    -- Espera o boot assentar antes de qualquer ação no mundo.
+    -- Evita delta de posição logo no execute (config salva pode
+    -- religar AutoSteal e o servidor mede o primeiro delta).
+    local function bootGrace()
+        local t0 = Ctx.BootTime or os.clock()
+        local waitLeft = 10 - (os.clock() - t0)
+        if waitLeft > 0 then task.wait(waitLeft) end
+    end
+
+    -- Dispara variações do MESMO remote com intervalo.
+    -- Rajada FireServer no mesmo tick = assinatura clássica de exploit.
+    -- variants: lista de listas de args. Ex: { {"All"}, {1}, {"Hatch"} }
+    local function staggered(remote, variants, gap)
+        if not remote then return end
+        gap = gap or 0.25
+        for i, args in ipairs(variants) do
+            if i > 1 then task.wait(gap) end
+            Rm.SafeFire(remote, table.unpack(args))
+        end
+    end
+
     function A.startFarm()
         task.spawn(function()
+            bootGrace()
             while true do
                 if State.AutoSteal or State.AutoStealAll then
                     local ok = pcall(function()
@@ -63,6 +85,7 @@ return function(Ctx)
 
     function A.startSnipe()
         task.spawn(function()
+            bootGrace()
             while true do
                 if State.AutoSnipe then
                     pcall(function()
@@ -89,6 +112,7 @@ return function(Ctx)
 
     function A.startHatch()
         task.spawn(function()
+            bootGrace()
             while true do
                 if State.AutoHatch then
                     pcall(function()
@@ -96,13 +120,13 @@ return function(Ctx)
                         local targetEgg = State.HatchEgg
                         if hatchR then
                             if targetEgg == "All" then
-                                Rm.SafeFire(hatchR, "All")
-                                Rm.SafeFire(hatchR, 1)
-                                Rm.SafeFire(hatchR, "Hatch")
+                                staggered(hatchR, { { "All" }, { 1 }, { "Hatch" } })
                             else
-                                Rm.SafeFire(hatchR, targetEgg)
-                                Rm.SafeFire(hatchR, targetEgg, 1)
-                                Rm.SafeFire(hatchR, { Egg = targetEgg })
+                                staggered(hatchR, {
+                                    { targetEgg },
+                                    { targetEgg, 1 },
+                                    { { Egg = targetEgg } },
+                                })
                             end
                         else
                             local cf = W.GetHatchCFrame()
@@ -117,7 +141,7 @@ return function(Ctx)
                         end
                         if State.AutoEquipBest then
                             local eq = Rm.Get("equip", { "equipbest", "equip_best", "equip", "bestpet" })
-                            if eq then Rm.SafeFire(eq, "Best") Rm.SafeFire(eq, true) end
+                            if eq then staggered(eq, { { "Best" }, { true } }) end
                         end
                     end)
                     task.wait(U.HDelay(math.clamp(State.HatchDelay, 0.1, 5)))
@@ -130,12 +154,13 @@ return function(Ctx)
 
     function A.startTrain()
         task.spawn(function()
+            bootGrace()
             while true do
                 if State.AutoTrain then
                     pcall(function()
                         local trainR = Rm.Get("train", { "train", "treadmill", "speed", "workout", "run" })
                         if trainR then
-                            Rm.SafeFire(trainR) Rm.SafeFire(trainR, 1) Rm.SafeFire(trainR, "Train")
+                            staggered(trainR, { {}, { 1 }, { "Train" } })
                         end
                         local cf = W.GetTreadmillCFrame()
                         if cf then
@@ -155,16 +180,16 @@ return function(Ctx)
                 if State.AutoUpgradeTreadmill then
                     pcall(function()
                         local up = Rm.Get("upT", { "upgradetreadmill", "treadmillupgrade", "buy treadmill", "treadmill" })
-                        if up then Rm.SafeFire(up) Rm.SafeFire(up, 1) Rm.SafeFire(up, "Treadmill") end
+                        if up then staggered(up, { {}, { 1 }, { "Treadmill" } }) end
                         local gen = Rm.Get("upgrade", { "upgrade", "buy", "purchase" })
-                        if gen and not up then Rm.SafeFire(gen, "Treadmill") Rm.SafeFire(gen, "treadmill", 1) end
+                        if gen and not up then staggered(gen, { { "Treadmill" }, { "treadmill", 1 } }) end
                     end)
                     task.wait(2)
                 end
                 if State.AutoUpgradeBase then
                     pcall(function()
                         local gen = Rm.Get("upgradeB", { "upgrade", "buy", "purchase", "base" })
-                        if gen then Rm.SafeFire(gen, "Base") Rm.SafeFire(gen, "base", 1) end
+                        if gen then staggered(gen, { { "Base" }, { "base", 1 } }) end
                     end)
                     task.wait(2)
                 end
@@ -172,7 +197,7 @@ return function(Ctx)
                     pcall(function()
                         local c = Rm.Get("collect",
                             { "collect", "claim", "income", "money", "cash", "reward", "index" })
-                        if c then Rm.SafeFire(c) Rm.SafeFire(c, "All") Rm.SafeFire(c, "Collect") end
+                        if c then staggered(c, { {}, { "All" }, { "Collect" } }) end
                         local cf = W.GetMyBaseCFrame()
                         if cf then Ix.FirePromptsInRadius(cf.Position, 25) end
                     end)

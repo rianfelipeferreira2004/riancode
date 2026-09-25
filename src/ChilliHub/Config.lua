@@ -39,7 +39,7 @@ function Config.newState()
         AutoReturn = false,
         AutoSnipe = false,
         SmartTween = true,
-        TweenSpeed = 220,
+        TweenSpeed = 150, -- teto do Modo Seguro; slider da UI vai até 600 p/ quem assume o risco
         StealDelay = 0.35,
         NoClip = false,
         FlySteal = false,
