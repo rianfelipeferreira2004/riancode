@@ -254,6 +254,9 @@ loadstring(GetScript("Tabs/AutoFarming.lua"))()
 Loading.Update(80)
 loadstring(GetScript("Tabs/Event.lua"))()
 
+Loading.Update(83)
+loadstring(GetScript("Tabs/Pet.lua"))()
+
 Loading.Update(85)
 loadstring(GetScript("Tabs/HopServer.lua"))()
 

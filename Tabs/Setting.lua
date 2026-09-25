@@ -5,7 +5,7 @@
 local TabsManager = _G.YOKUDO_TabsManager
 local TweenService = game:GetService("TweenService")
 
-local SettingTab, SettingPage = TabsManager:RegisterTab("Setting", 7, "SETTING")
+local SettingTab, SettingPage = TabsManager:RegisterTab("Setting", 8, "SETTING")
 
 --==================================================
 -- SETTING CONTENT

@@ -10,7 +10,7 @@ local TeleportService = game:GetService("TeleportService")
 
 local PLACE_ID = 107778070777162
 
-local HopServerTab, HopServerPage = TabsManager:RegisterTab("Hop Server", 6, "HOP_SERVER")
+local HopServerTab, HopServerPage = TabsManager:RegisterTab("Hop Server", 7, "HOP_SERVER")
 
 -- ==================================================
 -- CONTENT
