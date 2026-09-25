@@ -1,11 +1,11 @@
 --[[ 
-    Chilli Hub | Steal an Egg — Versão Limpa Rayfield + Save Config
+    Chilli Hub | Steal an Egg — Versão Limpa OrionLib + Save Config
     ----------------------------------------------------------------
     Origem: https://raw.githubusercontent.com/tienkhanh1/Chilli-Hub-Script/refs/heads/main/StealAnEgg
     Formato original: Luraph Obfuscator v15.0 (~1.58 MB, VM + constantes criptografadas)
     Este arquivo: reimplementação limpa, sem obfuscação, em 1 único script Lua,
-    com UI Rayfield (https://sirius.menu/rayfield), com ConfigurationSaving
-    (configs salvas por jogo).
+    com UI OrionLib (https://github.com/jensonhirst/Orion), com SaveConfig
+    (configs salvas por jogo) + fallback pra UI nativa no Delta.
 
     Jogo alvo: Steal An Egg (PlaceId 107778070777162)
     Loop do jogo: roubar ovo -> levar pra base -> chocar -> pet gera dinheiro
@@ -16,7 +16,7 @@
 ]]
 
 --========================================================
---// 1. LOADER 3-TIER (Rayfield -> Fluent -> Nativa)
+--// 1. LOADER (OrionLib -> Nativa)
 --========================================================
 local function bootNotify(title, text, dur)
     pcall(function()
@@ -27,7 +27,7 @@ local function bootNotify(title, text, dur)
 end
 bootNotify("Chilli Hub", "Iniciando... carregando UI", 4)
 
-local UI_MODE, Rayfield, Fluent, SaveManager, InterfaceManager = "Native", nil, nil, nil, nil
+local UI_MODE, OrionLib = "Native", nil
 local DiagLog = {}
 
 local function tryFetch(url)
@@ -48,55 +48,26 @@ local function tryChunk(res, name)
 end
 
 do
-    -- Tier 1: Rayfield (3 mirrors)
-    local rayUrls = {
-        { "sirius", "https://sirius.menu/rayfield" },
-        { "gh-raw", "https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua" },
-        { "jsdelivr", "https://cdn.jsdelivr.net/gh/sirius-menu/rayfield@main/source.lua" },
+    local orionUrls = {
+        { "gh", "https://raw.githubusercontent.com/jensonhirst/Orion/main/source" },
+        { "jsdelivr", "https://cdn.jsdelivr.net/gh/jensonhirst/Orion@main/source" },
     }
-    for _, pair in ipairs(rayUrls) do
+    for _, pair in ipairs(orionUrls) do
         local tag, u = pair[1], pair[2]
         local res, st = tryFetch(u)
         if not res then
-            table.insert(DiagLog, "ray/" .. tag .. " " .. st)
+            table.insert(DiagLog, "orion/" .. tag .. " " .. st)
         else
-            local lib, st2 = tryChunk(res, "Rayfield")
-            table.insert(DiagLog, "ray/" .. tag .. " " .. st .. " " .. st2)
-            if lib then Rayfield = lib UI_MODE = "Rayfield" break end
-        end
-    end
-    -- Tier 2: Fluent (UI em codigo puro, sem asset de modelo)
-    if UI_MODE ~= "Rayfield" then
-        local furls = {
-            "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua",
-            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua",
-        }
-        for _, u in ipairs(furls) do
-            local res, st = tryFetch(u)
-            if not res then
-                table.insert(DiagLog, "fluent " .. st)
-            else
-                local lib, st2 = tryChunk(res, "Fluent")
-                table.insert(DiagLog, "fluent " .. st .. " " .. st2)
-                if lib then Fluent = lib UI_MODE = "Fluent" break end
-            end
-        end
-        if UI_MODE == "Fluent" then
-            local okS, sm = pcall(function()
-                return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-            end)
-            local okI, im = pcall(function()
-                return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-            end)
-            if okS and sm then SaveManager = sm end
-            if okI and im then InterfaceManager = im end
+            local lib, st2 = tryChunk(res, "Orion")
+            table.insert(DiagLog, "orion/" .. tag .. " " .. st .. " " .. st2)
+            if lib then OrionLib = lib UI_MODE = "Orion" break end
         end
     end
     local full = "ChilliHub diag | " .. table.concat(DiagLog, " || ")
     print("[ChilliHub] " .. full)
     if UI_MODE == "Native" then
         pcall(function() if setclipboard then setclipboard(full) end end)
-        bootNotify("Chilli Hub", "Rayfield/Fluent falharam: usando UI NATIVA (diag copiado).", 8)
+        bootNotify("Chilli Hub", "Orion falhou: usando UI NATIVA (diag copiado).", 8)
     end
 end
 
@@ -119,13 +90,9 @@ local PLACE_ID = game.PlaceId
 
 local function Notify(title, content, dur)
     dur = dur or 4
-    if UI_MODE == "Rayfield" and Rayfield then
+    if UI_MODE == "Orion" and OrionLib then
         pcall(function()
-            Rayfield:Notify({ Title = tostring(title), Content = tostring(content), Duration = dur, Image = 4483362458 })
-        end)
-    elseif UI_MODE == "Fluent" and Fluent then
-        pcall(function()
-            Fluent:Notify({ Title = tostring(title), Content = tostring(content), Duration = dur })
+            OrionLib:MakeNotification({ Name = tostring(title), Content = tostring(content), Image = "rbxassetid://4483362458", Time = dur })
         end)
     else
         bootNotify(title, content, dur)
@@ -899,264 +866,63 @@ task.spawn(function()
 end)
 
 --========================================================
---// 9. UI BUILDERS (Rayfield / Fluent / Nativa)
+--// 9. UI BUILDERS (OrionLib / Nativa)
 --========================================================
-local function BuildRayfieldUI()
-local Window = Rayfield:CreateWindow({
-    Name = "Chilli Hub | Steal an Egg",
-    Icon = 0,
-    LoadingTitle = "Chilli Hub",
-    LoadingSubtitle = "by Chilli • Rayfield",
-    ShowText = "Chilli Hub",
-    Theme = "Default",
-    ToggleUIKeybind = "RightShift",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "ChilliHub",
-        FileName = "StealAnEgg"
-    },
-    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
-    KeySystem = false,
-})
-
-local FarmTab = Window:CreateTab("Farm", 4483362458)
-local PetsTab = Window:CreateTab("Pets", 4483362458)
-local TreinoTab = Window:CreateTab("Treino", 4483362458)
-local VisualTab = Window:CreateTab("Visual", 4483362458)
-local JogadorTab = Window:CreateTab("Jogador", 4483362458)
-local DiagTab = Window:CreateTab("Diagnostico", 4483362458)
-
-local function MultiToArray(v)
-    local out = {}
-    if type(v) ~= "table" then return out end
-    for _, s in ipairs(v) do table.insert(out, s) end
-    return out
-end
-
---========== FARM ==========
-FarmTab:CreateSection("Roubo automatico")
-
-FarmTab:CreateToggle({ Name = "Auto Steal (com filtros)", CurrentValue = false, Flag = "AutoSteal",
-    Callback = function(v) State.AutoSteal = v end })
-FarmTab:CreateToggle({ Name = "Auto Steal TUDO", CurrentValue = false, Flag = "AutoStealAll",
-    Callback = function(v) State.AutoStealAll = v end })
-FarmTab:CreateToggle({ Name = "Auto Voltar pra Base", CurrentValue = true, Flag = "AutoReturn",
-    Callback = function(v) State.AutoReturn = v end })
-FarmTab:CreateToggle({ Name = "Snipe Raros (Golden/Rainbow/Secret+)", CurrentValue = false, Flag = "AutoSnipe",
-    Callback = function(v) State.AutoSnipe = v end })
-FarmTab:CreateToggle({ Name = "Smart Tween + NoClip", CurrentValue = true, Flag = "SmartTween",
-    Callback = function(v) State.SmartTween = v end })
-
-FarmTab:CreateSlider({ Name = "Tween Speed (studs/s)", Range = {60, 600}, Increment = 5, CurrentValue = 220, Flag = "TweenSpeed",
-    Callback = function(v) State.TweenSpeed = v end })
-FarmTab:CreateSlider({ Name = "Delay entre roubos (s)", Range = {0.1, 2}, Increment = 0.05, CurrentValue = 0.35, Flag = "StealDelay",
-    Callback = function(v) State.StealDelay = v end })
-
-FarmTab:CreateSection("Filtros (vazio = todas)")
-FarmTab:CreateDropdown({ Name = "Zonas / Biomas", Options = ALL_ZONES, CurrentOption = {}, MultipleOptions = true, Flag = "FilterZones",
-    Callback = function(v) State.FilterZones = MultiToArray(v) end })
-FarmTab:CreateDropdown({ Name = "Raridades", Options = ALL_RARITIES, CurrentOption = {}, MultipleOptions = true, Flag = "FilterRarities",
-    Callback = function(v) State.FilterRarities = MultiToArray(v) end })
-FarmTab:CreateDropdown({ Name = "Mutacoes", Options = ALL_MUTATIONS, CurrentOption = {}, MultipleOptions = true, Flag = "FilterMutations",
-    Callback = function(v) State.FilterMutations = MultiToArray(v) end })
-FarmTab:CreateDropdown({ Name = "Prioridade do alvo", Options = { "Mais Raro", "Mais Próximo", "Mais Distante", "Maior Tamanho" }, CurrentOption = {"Mais Raro"}, MultipleOptions = false, Flag = "Priority",
-    Callback = function(v)
-        if type(v) == "table" then State.Priority = v[1] or "Mais Raro" else State.Priority = v end
-    end })
-
-FarmTab:CreateSection("Acoes rapidas")
-FarmTab:CreateButton({ Name = "Roubar melhor ovo AGORA", Callback = function()
-    task.spawn(function()
-        local eggs = SortEggs(FindEggs())
-        local t = eggs[1]
-        if t then TweenTo(CFrame.new(t.Position + Vector3.new(0, 4, 0))) TryStealEgg(t) Notify("Steal", t.Name .. " | " .. t.Rarity)
-        else Notify("Steal", "Nenhum ovo encontrado") end
-    end)
-end })
-FarmTab:CreateButton({ Name = "Voltar pra Base AGORA", Callback = function()
-    task.spawn(function()
-        local cf = GetMyBaseCFrame()
-        if cf then TweenTo(cf + Vector3.new(0, 5, 0)) FirePromptsInRadius(cf.Position, 20) Notify("Base", "Entregue / prompt ativado")
-        else Notify("Base", "Base não encontrada — use Diagnostico") end
-    end)
-end })
-
---========== PETS ==========
-PetsTab:CreateSection("Chocar ovos")
-PetsTab:CreateToggle({ Name = "Auto Hatch", CurrentValue = false, Flag = "AutoHatch",
-    Callback = function(v) State.AutoHatch = v end })
-PetsTab:CreateToggle({ Name = "Auto Equipar Melhor", CurrentValue = false, Flag = "AutoEquipBest",
-    Callback = function(v) State.AutoEquipBest = v end })
-PetsTab:CreateSlider({ Name = "Delay do Hatch (s)", Range = {0.2, 5}, Increment = 0.1, CurrentValue = 0.5, Flag = "HatchDelay",
-    Callback = function(v) State.HatchDelay = v end })
-PetsTab:CreateInput({ Name = "Ovo p/ Hatch (ou All)", CurrentValue = "All", PlaceholderText = "Ex: Cosmic / All", RemoveTextAfterFocusLost = false, Flag = "HatchEgg",
-    Callback = function(v) State.HatchEgg = (v == "" and "All" or v) end })
-PetsTab:CreateButton({ Name = "Equipar Melhor AGORA", Callback = function()
-    local eq = GetRemote("equip", { "equipbest", "equip_best", "equip", "bestpet" })
-    if eq then SafeFire(eq, "Best") Notify("Pets", "Equip Best disparado") else Notify("Pets", "Remote de equip não achado") end
-end })
-PetsTab:CreateButton({ Name = "Chocar 1x AGORA", Callback = function()
-    local h = GetRemote("hatch", { "hatch", "openegg", "open_egg", "unbox" })
-    if h then SafeFire(h, State.HatchEgg) Notify("Hatch", "Disparado: " .. tostring(State.HatchEgg))
-    else local cf = GetHatchCFrame() if cf then TweenTo(cf) FirePromptsInRadius(cf.Position, 20) end end
-end })
-
---========== TREINO ==========
-TreinoTab:CreateSection("Speed + Upgrades + Renda")
-TreinoTab:CreateToggle({ Name = "Auto Treinar (treadmill)", CurrentValue = false, Flag = "AutoTrain",
-    Callback = function(v) State.AutoTrain = v end })
-TreinoTab:CreateToggle({ Name = "Auto Upgrade Treadmill", CurrentValue = false, Flag = "AutoUpTread",
-    Callback = function(v) State.AutoUpgradeTreadmill = v end })
-TreinoTab:CreateToggle({ Name = "Auto Upgrade Base", CurrentValue = false, Flag = "AutoUpBase",
-    Callback = function(v) State.AutoUpgradeBase = v end })
-TreinoTab:CreateToggle({ Name = "Auto Coletar Dinheiro", CurrentValue = false, Flag = "AutoCollect",
-    Callback = function(v) State.AutoCollect = v end })
-TreinoTab:CreateSlider({ Name = "Delay coleta (s)", Range = {1, 30}, Increment = 0.5, CurrentValue = 2, Flag = "CollectDelay",
-    Callback = function(v) State.CollectDelay = v end })
-TreinoTab:CreateButton({ Name = "Ir pra Treadmill", Callback = function()
-    local cf = GetTreadmillCFrame()
-    if cf then TweenTo(cf) else Notify("Treino", "Treadmill não achada — use Diagnostico") end
-end })
-
---========== VISUAL ==========
-VisualTab:CreateSection("ESP")
-VisualTab:CreateToggle({ Name = "Egg ESP", CurrentValue = false, Flag = "EggESP",
-    Callback = function(v) State.EggESP = v end })
-VisualTab:CreateToggle({ Name = "Destacar melhor ovo", CurrentValue = true, Flag = "HighlightBest",
-    Callback = function(v) State.HighlightBest = v end })
-VisualTab:CreateToggle({ Name = "Player ESP (nome+dist+speed)", CurrentValue = false, Flag = "PlayerESP",
-    Callback = function(v) State.PlayerESP = v end })
-VisualTab:CreateSlider({ Name = "Distancia max ESP", Range = {200, 5000}, Increment = 50, CurrentValue = 1500, Flag = "ESPMaxDist",
-    Callback = function(v) State.ESPMaxDist = v end })
-VisualTab:CreateButton({ Name = "Limpar ESP", Callback = function() ClearESP("EGG_") ClearESP("BEST_") ClearESP("PLR_") end })
-
---========== JOGADOR ==========
-JogadorTab:CreateSection("Movimento")
-JogadorTab:CreateToggle({ Name = "Ativar WalkSpeed custom", CurrentValue = false, Flag = "WSEnabled",
-    Callback = function(v) State.WSEnabled = v end })
-JogadorTab:CreateSlider({ Name = "WalkSpeed", Range = {16, 250}, Increment = 1, CurrentValue = 16, Flag = "WalkSpeed",
-    Callback = function(v) State.WalkSpeed = v end })
-JogadorTab:CreateToggle({ Name = "Ativar Jump custom", CurrentValue = false, Flag = "JPEnabled",
-    Callback = function(v) State.JPEnabled = v end })
-JogadorTab:CreateSlider({ Name = "JumpPower", Range = {50, 400}, Increment = 1, CurrentValue = 50, Flag = "JumpPower",
-    Callback = function(v) State.JumpPower = v end })
-JogadorTab:CreateToggle({ Name = "NoClip", CurrentValue = false, Flag = "NoclipT",
-    Callback = function(v) SetNoclip(v) end })
-JogadorTab:CreateToggle({ Name = "Godmode (anti-catch)", CurrentValue = false, Flag = "Godmode",
-    Callback = function(v) State.Godmode = v end })
-JogadorTab:CreateToggle({ Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK",
-    Callback = function(v) State.AntiAFK = v end })
-
-JogadorTab:CreateSection("Servidor / Performance")
-JogadorTab:CreateButton({ Name = "Server Hop (servidor vazio)", Callback = ServerHop })
-JogadorTab:CreateButton({ Name = "Reentrar (Rejoin)", Callback = function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end })
-JogadorTab:CreateButton({ Name = "FPS Boost (tira sombra/efeito)", Callback = function()
-    pcall(function()
-        Lighting.GlobalShadows = false Lighting.FogEnd = 1e9
-        for _, v in ipairs(Lighting:GetChildren()) do if v:IsA("PostEffect") or v:IsA("Atmosphere") then v.Enabled = false end end
-        for _, o in ipairs(Workspace:GetDescendants()) do
-            if o:IsA("ParticleEmitter") or o:IsA("Trail") then o.Enabled = false end
-        end
-        Notify("FPS", "Boost aplicado")
-    end)
-end })
-
---========== DIAGNÓSTICO ==========
-DiagTab:CreateSection("Autodescoberta")
-DiagTab:CreateParagraph({ Title = "Scanners", Content = "Se algo não funcionar, rode os scanners. Fallback fisico (tween + prompt + touch) sobrevive a rename de Remote." })
-DiagTab:CreateButton({ Name = "Escanear Remotes", Callback = function()
-    local n = RefreshRemotes()
-    print("===== [ChilliHub] REMOTES (" .. n .. ") =====")
-    for _, r in ipairs(RemoteCache.list) do print(r.ClassName, r:GetFullName()) end
-    print("===== FIM =====")
-    local s = FindRemote({ "steal" }) local h = FindRemote({ "hatch" }) local t = FindRemote({ "train", "treadmill" })
-    local u = FindRemote({ "upgrade" }) local c = FindRemote({ "collect", "claim", "income" })
-    Notify("Remotes", ("Achados: %d | steal:%s hatch:%s train:%s up:%s collect:%s"):format(n, s and "ok" or "--", h and "ok" or "--", t and "ok" or "--", u and "ok" or "--", c and "ok" or "--"), 6)
-end })
-DiagTab:CreateButton({ Name = "Escanear Mapa (ovos/base/treadmill)", Callback = function()
-    local eggs = FindEggs()
-    local bcf = GetMyBaseCFrame()
-    local tcf = GetTreadmillCFrame()
-    local hcf = GetHatchCFrame()
-    print(("===== [ChilliHub] MAPA: ovos=%d base=%s treadmill=%s hatch=%s ====="):format(#eggs, bcf and "ok" or "NAO", tcf and "ok" or "NAO", hcf and "ok" or "NAO"))
-    for i = 1, math.min(#eggs, 20) do
-        local e = eggs[i]
-        print(i, e.Name, e.Rarity, e.Mutation, tostring(e.Position))
-    end
-    Notify("Mapa", ("Ovos: %d | Base: %s | Treadmill: %s"):format(#eggs, bcf and "OK" or "NÃO", tcf and "OK" or "NÃO"), 6)
-end })
-DiagTab:CreateButton({ Name = "Copiar lista de Remotes", Callback = function()
-    RefreshRemotes()
-    local t = {}
-    for _, r in ipairs(RemoteCache.list) do table.insert(t, r.ClassName .. " | " .. r:GetFullName()) end
-    if setclipboard then setclipboard(table.concat(t, "\n")) Notify("Clipboard", "Lista copiada (" .. #t .. ")") end
-end })
-
---========== SAVE CONFIG (Rayfield) ==========
-RefreshRemotes()
-Rayfield:Notify({ Title = "Chilli Hub", Content = "Carregado! Config salva em ChilliHub/StealAnEgg.json", Duration = 5, Image = 4483362458 })
-print("[ChilliHub] Rayfield + SaveConfig carregado. PlaceId:", PLACE_ID)
-
-Rayfield:LoadConfiguration()
-end -- BuildRayfieldUI
-
---========== BUILDER FLUENT (fallback, Dark + SaveManager) ==========
-local function BuildFluentUI()
-    if not Fluent then return end
-    local Window = Fluent:CreateWindow({
-        Title = "Chilli Hub | Steal an Egg",
-        SubTitle = "by Chilli - Fluent Dark (fallback)",
-        TabWidth = 160,
-        Size = UDim2.fromOffset(580, 460),
-        Acrylic = true,
-        Theme = "Dark",
-        MinimizeKey = Enum.KeyCode.RightShift
+local function BuildOrionUI()
+    if not OrionLib then return end
+    local Window = OrionLib:MakeWindow({
+        Name = "Chilli Hub | Steal an Egg",
+        HidePremium = false,
+        SaveConfig = true,
+        ConfigFolder = "ChilliHub_StealAnEgg",
+        IntroEnabled = false,
     })
-    local Tabs = {
-        Farm = Window:AddTab({ Title = "Farm", Icon = "zap" }),
-        Pets = Window:AddTab({ Title = "Pets", Icon = "bird" }),
-        Treino = Window:AddTab({ Title = "Treino", Icon = "activity" }),
-        Visual = Window:AddTab({ Title = "Visual", Icon = "eye" }),
-        Jogador = Window:AddTab({ Title = "Jogador", Icon = "user" }),
-        Diag = Window:AddTab({ Title = "Diagnostico", Icon = "info" }),
-        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
-    }
-    local Options = Fluent.Options
-    local function MultiToArrayF(v)
+    local FarmTab = Window:MakeTab({ Name = "Farm", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local PetsTab = Window:MakeTab({ Name = "Pets", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local TreinoTab = Window:MakeTab({ Name = "Treino", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local VisualTab = Window:MakeTab({ Name = "Visual", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local JogadorTab = Window:MakeTab({ Name = "Jogador", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local DiagTab = Window:MakeTab({ Name = "Diagnostico", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+
+    local function ParseList(s)
         local out = {}
-        if type(v) ~= "table" then return out end
-        local isDict = false
-        for _, s in pairs(v) do if type(s) == "boolean" then isDict = true break end end
-        if isDict then for k, s in pairs(v) do if s then table.insert(out, k) end end
-        else for _, s in ipairs(v) do table.insert(out, s) end end
+        if type(s) ~= "string" then return out end
+        for part in string.gmatch(s, "([^,]+)") do
+            part = string.match(part, "^%s*(.-)%s*$")
+            if part ~= "" then table.insert(out, part) end
+        end
         return out
     end
-    Tabs.Farm:AddParagraph({ Title = "Roubo automatico (modo fallback Fluent)", Content = "Rayfield falhou neste executor; mesmos recursos aqui." })
-    Tabs.Farm:AddToggle("AutoSteal", { Title = "Auto Steal (com filtros)", Default = false })
-    Tabs.Farm:AddToggle("AutoStealAll", { Title = "Auto Steal TUDO", Default = false })
-    Tabs.Farm:AddToggle("AutoReturn", { Title = "Auto Voltar pra Base", Default = true })
-    Tabs.Farm:AddToggle("AutoSnipe", { Title = "Snipe Raros", Default = false })
-    Tabs.Farm:AddToggle("SmartTween", { Title = "Smart Tween + NoClip", Default = true })
-    Options.AutoSteal:OnChanged(function() State.AutoSteal = Options.AutoSteal.Value end)
-    Options.AutoStealAll:OnChanged(function() State.AutoStealAll = Options.AutoStealAll.Value end)
-    Options.AutoReturn:OnChanged(function() State.AutoReturn = Options.AutoReturn.Value end)
-    Options.AutoSnipe:OnChanged(function() State.AutoSnipe = Options.AutoSnipe.Value end)
-    Options.SmartTween:OnChanged(function() State.SmartTween = Options.SmartTween.Value end)
-    Tabs.Farm:AddSlider("TweenSpeed", { Title = "Tween Speed", Default = 220, Min = 60, Max = 600, Rounding = 0 })
-    Tabs.Farm:AddSlider("StealDelay", { Title = "Delay roubos", Default = 0.35, Min = 0.1, Max = 2, Rounding = 2 })
-    Options.TweenSpeed:OnChanged(function(v) State.TweenSpeed = v end)
-    Options.StealDelay:OnChanged(function(v) State.StealDelay = v end)
-    local Z2 = Tabs.Farm:AddDropdown("FilterZones", { Title = "Zonas", Values = ALL_ZONES, Multi = true, Default = {} })
-    local R2 = Tabs.Farm:AddDropdown("FilterRarities", { Title = "Raridades", Values = ALL_RARITIES, Multi = true, Default = {} })
-    local M2 = Tabs.Farm:AddDropdown("FilterMutations", { Title = "Mutacoes", Values = ALL_MUTATIONS, Multi = true, Default = {} })
-    local P2 = Tabs.Farm:AddDropdown("Priority", { Title = "Prioridade", Values = { "Mais Raro", "Mais Proximo", "Mais Distante", "Maior Tamanho" }, Multi = false, Default = 1 })
-    Z2:OnChanged(function(v) State.FilterZones = MultiToArrayF(v) end)
-    R2:OnChanged(function(v) State.FilterRarities = MultiToArrayF(v) end)
-    M2:OnChanged(function(v) State.FilterMutations = MultiToArrayF(v) end)
-    P2:OnChanged(function(v) State.Priority = (type(v) == "table" and v[1]) or v end)
-    Tabs.Farm:AddButton({ Title = "Roubar melhor ovo AGORA", Callback = function()
+    local Blue = Color3.fromRGB(0, 170, 255)
+
+    --========== FARM ==========
+    FarmTab:AddSection({ Name = "Roubo automatico" })
+    FarmTab:AddToggle({ Name = "Auto Steal (filtros)", Default = false, Save = true, Flag = "AutoSteal",
+        Callback = function(v) State.AutoSteal = v end })
+    FarmTab:AddToggle({ Name = "Auto Steal TUDO", Default = false, Save = true, Flag = "AutoStealAll",
+        Callback = function(v) State.AutoStealAll = v end })
+    FarmTab:AddToggle({ Name = "Auto Voltar pra Base", Default = true, Save = true, Flag = "AutoReturn",
+        Callback = function(v) State.AutoReturn = v end })
+    FarmTab:AddToggle({ Name = "Snipe Raros (Golden/Rainbow/Secret+)", Default = false, Save = true, Flag = "AutoSnipe",
+        Callback = function(v) State.AutoSnipe = v end })
+    FarmTab:AddToggle({ Name = "Smart Tween + NoClip", Default = true, Save = true, Flag = "SmartTween",
+        Callback = function(v) State.SmartTween = v end })
+    FarmTab:AddSlider({ Name = "Tween Speed", Min = 60, Max = 600, Default = 220, Color = Blue, Increment = 5, ValueName = "studs/s", Save = true, Flag = "TweenSpeed",
+        Callback = function(v) State.TweenSpeed = v end })
+    FarmTab:AddSlider({ Name = "Delay roubos", Min = 0.1, Max = 2, Default = 0.35, Color = Blue, Increment = 0.05, ValueName = "s", Save = true, Flag = "StealDelay",
+        Callback = function(v) State.StealDelay = v end })
+    FarmTab:AddSection({ Name = "Filtros (vazio = todas)" })
+    FarmTab:AddTextbox({ Name = "Zonas (ex: Cosmic,Secret)", Default = "", TextDisappear = false, Save = true, Flag = "FilterZones",
+        Callback = function(v) State.FilterZones = ParseList(v) end })
+    FarmTab:AddTextbox({ Name = "Raridades (ex: Secret,Eternal)", Default = "", TextDisappear = false, Save = true, Flag = "FilterRarities",
+        Callback = function(v) State.FilterRarities = ParseList(v) end })
+    FarmTab:AddTextbox({ Name = "Mutacoes (ex: Golden,Rainbow)", Default = "", TextDisappear = false, Save = true, Flag = "FilterMutations",
+        Callback = function(v) State.FilterMutations = ParseList(v) end })
+    FarmTab:AddDropdown({ Name = "Prioridade do alvo", Default = "Mais Raro",
+        Options = { "Mais Raro", "Mais Proximo", "Mais Distante", "Maior Tamanho" }, Save = true, Flag = "Priority",
+        Callback = function(v) State.Priority = v end })
+    FarmTab:AddSection({ Name = "Acoes rapidas" })
+    FarmTab:AddButton({ Name = "Roubar melhor ovo AGORA", Callback = function()
         task.spawn(function()
             local eggs = SortEggs(FindEggs())
             local t = eggs[1]
@@ -1164,70 +930,83 @@ local function BuildFluentUI()
             else Notify("Steal", "Nenhum ovo encontrado") end
         end)
     end })
-    Tabs.Farm:AddButton({ Title = "Voltar pra Base AGORA", Callback = function()
+    FarmTab:AddButton({ Name = "Voltar pra Base AGORA", Callback = function()
         task.spawn(function()
             local cf = GetMyBaseCFrame()
             if cf then TweenTo(cf + Vector3.new(0, 5, 0)) FirePromptsInRadius(cf.Position, 20) Notify("Base", "Entregue / prompt ativado")
-            else Notify("Base", "Base nao encontrada") end
+            else Notify("Base", "Base nao encontrada - use Diagnostico") end
         end)
     end })
-    Tabs.Pets:AddToggle("AutoHatch", { Title = "Auto Hatch", Default = false })
-    Tabs.Pets:AddToggle("AutoEquipBest", { Title = "Auto Equipar Melhor", Default = false })
-    Options.AutoHatch:OnChanged(function() State.AutoHatch = Options.AutoHatch.Value end)
-    Options.AutoEquipBest:OnChanged(function() State.AutoEquipBest = Options.AutoEquipBest.Value end)
-    Tabs.Pets:AddSlider("HatchDelay", { Title = "Delay Hatch", Default = 0.5, Min = 0.2, Max = 5, Rounding = 1 })
-    Options.HatchDelay:OnChanged(function(v) State.HatchDelay = v end)
-    local HI = Tabs.Pets:AddInput("HatchEgg", { Title = "Ovo p/ Hatch", Default = "All", Placeholder = "Ex: Cosmic / All", Numeric = false, Finished = false })
-    HI:OnChanged(function() State.HatchEgg = (Options.HatchEgg.Value == "" and "All" or Options.HatchEgg.Value) end)
-    Tabs.Pets:AddButton({ Title = "Equipar Melhor AGORA", Callback = function()
+
+    --========== PETS ==========
+    PetsTab:AddSection({ Name = "Chocar ovos" })
+    PetsTab:AddToggle({ Name = "Auto Hatch", Default = false, Save = true, Flag = "AutoHatch",
+        Callback = function(v) State.AutoHatch = v end })
+    PetsTab:AddToggle({ Name = "Auto Equipar Melhor", Default = false, Save = true, Flag = "AutoEquipBest",
+        Callback = function(v) State.AutoEquipBest = v end })
+    PetsTab:AddSlider({ Name = "Delay Hatch", Min = 0.2, Max = 5, Default = 0.5, Color = Blue, Increment = 0.1, ValueName = "s", Save = true, Flag = "HatchDelay",
+        Callback = function(v) State.HatchDelay = v end })
+    PetsTab:AddTextbox({ Name = "Ovo p/ Hatch (ou All)", Default = "All", TextDisappear = false, Save = true, Flag = "HatchEgg",
+        Callback = function(v) State.HatchEgg = (v == "" and "All" or v) end })
+    PetsTab:AddButton({ Name = "Equipar Melhor AGORA", Callback = function()
         local eq = GetRemote("equip", { "equipbest", "equip_best", "equip", "bestpet" })
         if eq then SafeFire(eq, "Best") Notify("Pets", "Equip Best disparado") else Notify("Pets", "Remote nao achado") end
     end })
-    Tabs.Pets:AddButton({ Title = "Chocar 1x AGORA", Callback = function()
+    PetsTab:AddButton({ Name = "Chocar 1x AGORA", Callback = function()
         local h = GetRemote("hatch", { "hatch", "openegg", "open_egg", "unbox" })
         if h then SafeFire(h, State.HatchEgg) Notify("Hatch", "Disparado: " .. tostring(State.HatchEgg))
         else local cf = GetHatchCFrame() if cf then TweenTo(cf) FirePromptsInRadius(cf.Position, 20) end end
     end })
-    Tabs.Treino:AddToggle("AutoTrain", { Title = "Auto Treinar", Default = false })
-    Tabs.Treino:AddToggle("AutoUpTread", { Title = "Auto Upgrade Treadmill", Default = false })
-    Tabs.Treino:AddToggle("AutoUpBase", { Title = "Auto Upgrade Base", Default = false })
-    Tabs.Treino:AddToggle("AutoCollect", { Title = "Auto Coletar", Default = false })
-    Options.AutoTrain:OnChanged(function() State.AutoTrain = Options.AutoTrain.Value end)
-    Options.AutoUpTread:OnChanged(function() State.AutoUpgradeTreadmill = Options.AutoUpTread.Value end)
-    Options.AutoUpBase:OnChanged(function() State.AutoUpgradeBase = Options.AutoUpBase.Value end)
-    Options.AutoCollect:OnChanged(function() State.AutoCollect = Options.AutoCollect.Value end)
-    Tabs.Treino:AddSlider("CollectDelay", { Title = "Delay coleta", Default = 2, Min = 1, Max = 30, Rounding = 1 })
-    Options.CollectDelay:OnChanged(function(v) State.CollectDelay = v end)
-    Tabs.Treino:AddButton({ Title = "Ir pra Treadmill", Callback = function()
+
+    --========== TREINO ==========
+    TreinoTab:AddSection({ Name = "Speed + Upgrades + Renda" })
+    TreinoTab:AddToggle({ Name = "Auto Treinar (treadmill)", Default = false, Save = true, Flag = "AutoTrain",
+        Callback = function(v) State.AutoTrain = v end })
+    TreinoTab:AddToggle({ Name = "Auto Upgrade Treadmill", Default = false, Save = true, Flag = "AutoUpTread",
+        Callback = function(v) State.AutoUpgradeTreadmill = v end })
+    TreinoTab:AddToggle({ Name = "Auto Upgrade Base", Default = false, Save = true, Flag = "AutoUpBase",
+        Callback = function(v) State.AutoUpgradeBase = v end })
+    TreinoTab:AddToggle({ Name = "Auto Coletar Dinheiro", Default = false, Save = true, Flag = "AutoCollect",
+        Callback = function(v) State.AutoCollect = v end })
+    TreinoTab:AddSlider({ Name = "Delay coleta", Min = 1, Max = 30, Default = 2, Color = Blue, Increment = 0.5, ValueName = "s", Save = true, Flag = "CollectDelay",
+        Callback = function(v) State.CollectDelay = v end })
+    TreinoTab:AddButton({ Name = "Ir pra Treadmill", Callback = function()
         local cf = GetTreadmillCFrame()
-        if cf then TweenTo(cf) else Notify("Treino", "Treadmill nao achada") end
+        if cf then TweenTo(cf) else Notify("Treino", "Treadmill nao achada - use Diagnostico") end
     end })
-    Tabs.Visual:AddToggle("EggESP", { Title = "Egg ESP", Default = false })
-    Tabs.Visual:AddToggle("HighlightBest", { Title = "Destacar melhor ovo", Default = true })
-    Tabs.Visual:AddToggle("PlayerESP", { Title = "Player ESP", Default = false })
-    Options.EggESP:OnChanged(function() State.EggESP = Options.EggESP.Value end)
-    Options.HighlightBest:OnChanged(function() State.HighlightBest = Options.HighlightBest.Value end)
-    Options.PlayerESP:OnChanged(function() State.PlayerESP = Options.PlayerESP.Value end)
-    Tabs.Visual:AddSlider("ESPMaxDist", { Title = "Dist max ESP", Default = 1500, Min = 200, Max = 5000, Rounding = 0 })
-    Options.ESPMaxDist:OnChanged(function(v) State.ESPMaxDist = v end)
-    Tabs.Visual:AddButton({ Title = "Limpar ESP", Callback = function() ClearESP("EGG_") ClearESP("BEST_") ClearESP("PLR_") end })
-    Tabs.Jogador:AddToggle("WSEnabled", { Title = "WalkSpeed custom", Default = false })
-    Options.WSEnabled:OnChanged(function() State.WSEnabled = Options.WSEnabled.Value end)
-    Tabs.Jogador:AddSlider("WalkSpeed", { Title = "WalkSpeed", Default = 16, Min = 16, Max = 250, Rounding = 0 })
-    Options.WalkSpeed:OnChanged(function(v) State.WalkSpeed = v end)
-    Tabs.Jogador:AddToggle("JPEnabled", { Title = "Jump custom", Default = false })
-    Options.JPEnabled:OnChanged(function() State.JPEnabled = Options.JPEnabled.Value end)
-    Tabs.Jogador:AddSlider("JumpPower", { Title = "JumpPower", Default = 50, Min = 50, Max = 400, Rounding = 0 })
-    Options.JumpPower:OnChanged(function(v) State.JumpPower = v end)
-    Tabs.Jogador:AddToggle("NoclipT", { Title = "NoClip", Default = false })
-    Options.NoclipT:OnChanged(function() SetNoclip(Options.NoclipT.Value) end)
-    Tabs.Jogador:AddToggle("Godmode", { Title = "Godmode", Default = false })
-    Options.Godmode:OnChanged(function() State.Godmode = Options.Godmode.Value end)
-    Tabs.Jogador:AddToggle("AntiAFK", { Title = "Anti-AFK", Default = true })
-    Options.AntiAFK:OnChanged(function() State.AntiAFK = Options.AntiAFK.Value end)
-    Tabs.Jogador:AddButton({ Title = "Server Hop", Callback = ServerHop })
-    Tabs.Jogador:AddButton({ Title = "Rejoin", Callback = function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end })
-    Tabs.Jogador:AddButton({ Title = "FPS Boost", Callback = function()
+
+    --========== VISUAL ==========
+    VisualTab:AddSection({ Name = "ESP" })
+    VisualTab:AddToggle({ Name = "Egg ESP", Default = false, Save = true, Flag = "EggESP",
+        Callback = function(v) State.EggESP = v end })
+    VisualTab:AddToggle({ Name = "Destacar melhor ovo", Default = true, Save = true, Flag = "HighlightBest",
+        Callback = function(v) State.HighlightBest = v end })
+    VisualTab:AddToggle({ Name = "Player ESP", Default = false, Save = true, Flag = "PlayerESP",
+        Callback = function(v) State.PlayerESP = v end })
+    VisualTab:AddSlider({ Name = "Distancia max ESP", Min = 200, Max = 5000, Default = 1500, Color = Blue, Increment = 50, ValueName = "studs", Save = true, Flag = "ESPMaxDist",
+        Callback = function(v) State.ESPMaxDist = v end })
+    VisualTab:AddButton({ Name = "Limpar ESP", Callback = function() ClearESP("EGG_") ClearESP("BEST_") ClearESP("PLR_") end })
+
+    --========== JOGADOR ==========
+    JogadorTab:AddSection({ Name = "Movimento" })
+    JogadorTab:AddToggle({ Name = "WalkSpeed custom", Default = false, Save = true, Flag = "WSEnabled",
+        Callback = function(v) State.WSEnabled = v end })
+    JogadorTab:AddSlider({ Name = "WalkSpeed", Min = 16, Max = 250, Default = 16, Color = Blue, Increment = 1, ValueName = "", Save = true, Flag = "WalkSpeed",
+        Callback = function(v) State.WalkSpeed = v end })
+    JogadorTab:AddToggle({ Name = "Jump custom", Default = false, Save = true, Flag = "JPEnabled",
+        Callback = function(v) State.JPEnabled = v end })
+    JogadorTab:AddSlider({ Name = "JumpPower", Min = 50, Max = 400, Default = 50, Color = Blue, Increment = 1, ValueName = "", Save = true, Flag = "JumpPower",
+        Callback = function(v) State.JumpPower = v end })
+    JogadorTab:AddToggle({ Name = "NoClip", Default = false, Save = true, Flag = "NoclipT",
+        Callback = function(v) SetNoclip(v) end })
+    JogadorTab:AddToggle({ Name = "Godmode (anti-catch)", Default = false, Save = true, Flag = "Godmode",
+        Callback = function(v) State.Godmode = v end })
+    JogadorTab:AddToggle({ Name = "Anti-AFK", Default = true, Save = true, Flag = "AntiAFK",
+        Callback = function(v) State.AntiAFK = v end })
+    JogadorTab:AddSection({ Name = "Servidor / Performance" })
+    JogadorTab:AddButton({ Name = "Server Hop (servidor vazio)", Callback = ServerHop })
+    JogadorTab:AddButton({ Name = "Reentrar (Rejoin)", Callback = function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end })
+    JogadorTab:AddButton({ Name = "FPS Boost", Callback = function()
         pcall(function()
             Lighting.GlobalShadows = false Lighting.FogEnd = 1e9
             for _, v in ipairs(Lighting:GetChildren()) do if v:IsA("PostEffect") or v:IsA("Atmosphere") then v.Enabled = false end end
@@ -1237,31 +1016,37 @@ local function BuildFluentUI()
             Notify("FPS", "Boost aplicado")
         end)
     end })
-    Tabs.Diag:AddButton({ Title = "Escanear Remotes", Callback = function()
+
+    --========== DIAGNOSTICO ==========
+    DiagTab:AddSection({ Name = "Autodescoberta" })
+    DiagTab:AddParagraph("Scanners", "Se algo nao funcionar, rode os scanners. Fallback fisico (tween + prompt + touch) sobrevive a rename de Remote.")
+    DiagTab:AddButton({ Name = "Escanear Remotes", Callback = function()
         local n = RefreshRemotes()
+        print("===== [ChilliHub] REMOTES (" .. n .. ") =====")
+        for _, r in ipairs(RemoteCache.list) do print(r.ClassName, r:GetFullName()) end
+        print("===== FIM =====")
         Notify("Remotes", "Achados: " .. n, 6)
     end })
-    Tabs.Diag:AddButton({ Title = "Escanear Mapa", Callback = function()
+    DiagTab:AddButton({ Name = "Escanear Mapa", Callback = function()
         local eggs = FindEggs()
         local bcf = GetMyBaseCFrame()
-        Notify("Mapa", ("Ovos: %d | Base: %s"):format(#eggs, bcf and "OK" or "NAO"), 6)
+        local tcf = GetTreadmillCFrame()
+        Notify("Mapa", ("Ovos: %d | Base: %s | Treadmill: %s"):format(#eggs, bcf and "OK" or "NAO", tcf and "OK" or "NAO"), 6)
     end })
-    if SaveManager and InterfaceManager then
-        SaveManager:SetLibrary(Fluent)
-        InterfaceManager:SetLibrary(Fluent)
-        SaveManager:IgnoreThemeSettings()
-        SaveManager:SetIgnoreIndexes({})
-        InterfaceManager:SetFolder("ChilliHub")
-        SaveManager:SetFolder("ChilliHub/StealAnEgg")
-        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-        SaveManager:BuildConfigSection(Tabs.Settings)
-    end
-    Window:SelectTab(1)
+    DiagTab:AddButton({ Name = "Copiar lista de Remotes", Callback = function()
+        RefreshRemotes()
+        local t = {}
+        for _, r in ipairs(RemoteCache.list) do table.insert(t, r.ClassName .. " | " .. r:GetFullName()) end
+        if setclipboard then setclipboard(table.concat(t, "\n")) Notify("Clipboard", "Lista copiada (" .. #t .. ")") end
+    end })
+
     RefreshRemotes()
-    Notify("Chilli Hub", "Carregado no modo Fluent (fallback).", 5)
-    print("[ChilliHub] Fluent fallback carregado. PlaceId:", PLACE_ID)
-    if SaveManager then SaveManager:LoadAutoloadConfig() end
-end -- BuildFluentUI
+    Notify("Chilli Hub", "Carregado! Config salva em ChilliHub_StealAnEgg.", 5)
+    print("[ChilliHub] OrionLib + SaveConfig carregado. PlaceId:", PLACE_ID)
+    OrionLib:Init()
+end -- BuildOrionUI
+
+--========== (builder Fluent removido na migracao OrionLib) ==========
 
 --========== BUILDER UI NATIVA (zero dependencia, sempre funciona) ==========
 local function BuildNativeUI()
@@ -1440,12 +1225,8 @@ end -- BuildNativeUI
 RefreshRemotes()
 do
     local built = false
-    if UI_MODE == "Rayfield" then
-        built = pcall(BuildRayfieldUI)
-        if not built then UI_MODE = "Fluent" end
-    end
-    if UI_MODE == "Fluent" then
-        built = pcall(BuildFluentUI)
+    if UI_MODE == "Orion" then
+        built = pcall(BuildOrionUI)
         if not built then UI_MODE = "Native" end
     end
     if UI_MODE == "Native" then
