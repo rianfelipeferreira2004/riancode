@@ -84,6 +84,7 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
 local VirtualUser = cloneref(game:GetService("VirtualUser"))
 local Lighting = cloneref(game:GetService("Lighting"))
+local PathfindingService = cloneref(game:GetService("PathfindingService"))
 
 local LocalPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
@@ -156,6 +157,9 @@ local State = {
     AntiKick = true,
     Humanized = false,
     BlockKickRemotes = false,
+    SafeMode = true,
+    UseRemotes = true,
+    UsePathfind = false,
 }
 
 -- Listas conhecidas do jogo (podem expandir com updates)
@@ -266,6 +270,10 @@ local function TweenTo(cf, speed)
     if not hrp then return false end
     speed = speed or State.TweenSpeed
     if speed <= 0 then speed = 220 end
+    if State.SafeMode then
+        speed = math.min(speed, 150)
+        cf = cf + Vector3.new((math.random() - 0.5) * 6, 0, (math.random() - 0.5) * 6)
+    end
     local dist = (hrp.Position - cf.Position).Magnitude
     if dist < 4 then return true end
     local t = math.clamp(dist / speed, 0.05, 12)
@@ -290,6 +298,31 @@ local function TweenTo(cf, speed)
         State.NoClip = wasNoclip
     end
     return done
+end
+
+-- Caminho por waypoints (parece movimento legitimo, evita deteccao de TP).
+-- Cai pro tween direto se nao achar rota.
+local function TweenPathTo(targetCF)
+    if not State.UsePathfind then return TweenTo(targetCF) end
+    local hrp = HRP()
+    if not hrp then return false end
+    local ok, path = pcall(function()
+        local p = PathfindingService:CreatePath({ AgentRadius = 2, AgentHeight = 5, AgentCanJump = true })
+        p:ComputeAsync(hrp.Position, targetCF.Position)
+        return p
+    end)
+    if not ok or not path or path.Status ~= Enum.PathStatus.Success then
+        return TweenTo(targetCF)
+    end
+    for _, wp in ipairs(path:GetWaypoints()) do
+        if not HRP() then return false end
+        TweenTo(CFrame.new(wp.Position + Vector3.new(0, 3, 0)))
+        if wp.Action == Enum.PathWaypointAction.Jump then
+            local h = Hum()
+            if h then h.Jump = true end
+        end
+    end
+    return TweenTo(targetCF)
 end
 
 local function FirePromptsInRadius(pos, radius)
@@ -608,17 +641,14 @@ end
 
 local function TryStealEgg(info)
     local pos = info.Position
-    -- 1) remote (se existir)
-    local stealR = GetRemote("steal", { "steal", "takeegg", "take_egg", "grabegg", "grab_egg", "collectegg" })
-    if stealR then
-        -- tenta variações comuns de args
-        SafeFire(stealR, info.Model)
-        SafeFire(stealR, info.Model.Name)
-        SafeFire(stealR, info.Model:GetAttribute("Id") or info.Model.Name)
-    end
-    -- 2) físico: encosta + prompt (funciona mesmo sem remote mapeado)
+    -- 1) fisico primeiro (prompt + toque): nao passa por remote
     TouchAllInRadius(pos, 14)
     FirePromptsInRadius(pos, 14)
+    -- 2) remote UMA vez e so se permitido (spammar variacoes = kick certo)
+    if State.UseRemotes then
+        local stealR = GetRemote("steal", { "steal", "takeegg", "take_egg", "grabegg", "grab_egg", "collectegg" })
+        if stealR then SafeFire(stealR, info.Model) end
+    end
     return true
 end
 
@@ -631,7 +661,7 @@ task.spawn(function()
             local ok, err = pcall(function()
                 if GetCarryingEgg() and State.AutoReturn then
                     local cf = GetMyBaseCFrame()
-                    if cf then TweenTo(cf + Vector3.new(0, 4, 0)) task.wait(0.3) FirePromptsInRadius(cf.Position, 20) end
+                    if cf then TweenPathTo(cf + Vector3.new(0, 4, 0)) task.wait(0.3) FirePromptsInRadius(cf.Position, 20) end
                     task.wait(HDelay(State.StealDelay))
                 else
                     local eggs = FindEggs()
@@ -646,7 +676,7 @@ task.spawn(function()
                         local hrp = HRP()
                         local dist = hrp and (hrp.Position - target.Position).Magnitude or 9999
                         if dist > 10 then
-                            TweenTo(CFrame.new(target.Position + Vector3.new(0, 4, 0)))
+                            TweenPathTo(CFrame.new(target.Position + Vector3.new(0, 4, 0)))
                         else
                             TryStealEgg(target)
                             task.wait(HDelay(State.StealDelay))
@@ -675,7 +705,7 @@ task.spawn(function()
                     local lm = string.lower(e.Mutation)
                     if rs >= 5 or lm == "golden" or lm == "rainbow" then
                         if not GetCarryingEgg() then
-                            TweenTo(CFrame.new(e.Position + Vector3.new(0, 4, 0)))
+                            TweenPathTo(CFrame.new(e.Position + Vector3.new(0, 4, 0)))
                             TryStealEgg(e)
                             break
                         end
@@ -1084,6 +1114,12 @@ local function BuildOrionUI()
         Callback = function(v) State.Humanized = v end })
     ProtTab:AddToggle({ Name = "Bloquear remotes Kick/Ban (agressivo)", Default = false, Save = true, Flag = "BlockKickRemotes",
         Callback = function(v) State.BlockKickRemotes = v end })
+    ProtTab:AddToggle({ Name = "Modo Seguro (tween 150 + jitter)", Default = true, Save = true, Flag = "SafeMode",
+        Callback = function(v) State.SafeMode = v end })
+    ProtTab:AddToggle({ Name = "Usar Remotes no steal", Default = true, Save = true, Flag = "UseRemotes",
+        Callback = function(v) State.UseRemotes = v end })
+    ProtTab:AddToggle({ Name = "Pathfinding (anti-TP)", Default = false, Save = true, Flag = "UsePathfind",
+        Callback = function(v) State.UsePathfind = v end })
     ProtTab:AddButton({ Name = "Reaplicar Bypass agora", Callback = function() SetupAntiCheat(true) end })
 
     --========== DIAGNOSTICO ==========
@@ -1280,6 +1316,9 @@ local function BuildNativeUI()
     toggle("Anti-Kick", function() return State.AntiKick end, function(v) State.AntiKick = v if v then SetupAntiCheat() end end)
     toggle("Modo Humano", function() return State.Humanized end, function(v) State.Humanized = v end)
     toggle("Block Kick/Ban", function() return State.BlockKickRemotes end, function(v) State.BlockKickRemotes = v end)
+    toggle("Modo Seguro", function() return State.SafeMode end, function(v) State.SafeMode = v end)
+    toggle("Usar Remotes", function() return State.UseRemotes end, function(v) State.UseRemotes = v end)
+    toggle("Pathfinding", function() return State.UsePathfind end, function(v) State.UsePathfind = v end)
     header("DIAGNOSTICO")
     button("Escanear Remotes", function()
         local n = RefreshRemotes()
@@ -1308,6 +1347,9 @@ do
     print("[ChilliHub] UI ativa: " .. tostring(UI_MODE) .. " | " .. table.concat(DiagLog, " || "))
 end
 task.spawn(function()
-    task.wait(2)
+    if State.AntiKick then SetupAntiCheat() end
+end)
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
     if State.AntiKick then SetupAntiCheat() end
 end)
