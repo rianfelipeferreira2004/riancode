@@ -18,40 +18,53 @@
 --========================================================
 --// 1. LOAD RAYFIELD (com fallback p/ Delta)
 --========================================================
-pcall(function()
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Chilli Hub",
-        Text = "Iniciando... carregando UI",
-        Duration = 4
-    })
-end)
+local function bootNotify(title, text, dur)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = tostring(title), Text = tostring(text), Duration = dur or 6
+        })
+    end)
+end
+bootNotify("Chilli Hub", "Iniciando... carregando UI", 4)
 
 local Rayfield
 do
     local urls = {
-        "https://sirius.menu/rayfield",
-        "https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua",
+        { "sirius", "https://sirius.menu/rayfield" },
+        { "gh-raw", "https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua" },
+        { "jsdelivr", "https://cdn.jsdelivr.net/gh/sirius-menu/rayfield@main/source.lua" },
     }
-    local err = "desconhecido"
-    for _, u in ipairs(urls) do
-        local ok, res = pcall(function() return game:HttpGet(u) end)
-        if ok and type(res) == "string" and #res > 10000 then
-            local ok2, lib = pcall(function() return loadstring(res)() end)
-            if ok2 and lib then Rayfield = lib break end
-            err = tostring(lib)
+    local log = {}
+    for _, pair in ipairs(urls) do
+        local tag, u = pair[1], pair[2]
+        local ok, res = pcall(game.HttpGet, game, u)
+        if not ok then
+            table.insert(log, tag .. " http-FAIL: " .. string.sub(tostring(res), 1, 90))
+        elseif type(res) ~= "string" or #res < 10000 then
+            table.insert(log, tag .. " http-curto(" .. tostring(res and #res) .. "b): " .. string.sub(tostring(res), 1, 90))
         else
-            err = tostring(res)
+            local fn, cerr = loadstring(res, "Rayfield")
+            if not fn then
+                table.insert(log, tag .. " compile-FAIL(" .. #res .. "b): " .. string.sub(tostring(cerr), 1, 110))
+            else
+                local ok2, lib = pcall(fn)
+                if ok2 and lib then
+                    Rayfield = lib
+                    table.insert(log, tag .. " OK(" .. #res .. "b)")
+                    break
+                else
+                    table.insert(log, tag .. " run-FAIL(" .. #res .. "b): " .. string.sub(tostring(lib), 1, 110))
+                end
+            end
         end
     end
     if not Rayfield then
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "Chilli Hub ERRO",
-                Text = "Falha ao baixar Rayfield: " .. string.sub(tostring(err), 1, 120),
-                Duration = 10
-            })
-        end)
-        warn("[ChilliHub] Falha ao carregar Rayfield: " .. tostring(err))
+        local full = "ChilliHub diag | " .. table.concat(log, " || ")
+        pcall(function() if setclipboard then setclipboard(full) end end)
+        warn("[ChilliHub] " .. full)
+        bootNotify("Chilli Hub ERRO", "Falha ao baixar Rayfield (diag copiado).", 8)
+        task.wait(0.5)
+        bootNotify("Chilli Hub ERRO 2/2", string.sub(table.concat(log, " || "), 1, 200), 10)
         return
     end
 end
