@@ -78,8 +78,10 @@ function Config.newState()
         AntiAFK = true,
         Godmode = false,
 
-        -- Proteção / bypass
-        AntiKick = true,
+        -- Proteção / bypass (paridade YokuHub: NADA agressivo liga sozinho.
+        -- Hooks de metamethod e UI Orion são opt-in: o AC client-side do
+        -- jogo pode detectar ambos no boot.)
+        AntiKick = false,
         Humanized = false,
         BlockKickRemotes = false,
         SafeMode = true,
@@ -87,6 +89,10 @@ function Config.newState()
         UsePathfind = false,
         SpoofProps = false,
         AutoRejoin = true,
+
+        -- UI: Nativa por padrão. Orion (nome famoso, blacklistável)
+        -- só com opt-in explícito.
+        UseOrion = false,
     }
 end
 

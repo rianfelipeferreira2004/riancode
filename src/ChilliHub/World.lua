@@ -212,12 +212,20 @@ return function(Ctx)
         return list
     end
 
-    -- 1) físico primeiro (prompt + toque), 2) remote UMA vez se permitido
+    -- 1) fisico primeiro (prompt + toque), 2) remote UMA vez se permitido.
+    -- Ordem YokuHub: tenta o protocolo REAL do jogo
+    -- (RF/EggWorld/AskFieldEggCarry InvokeServer {Uid}) antes do
+    -- chute generico por keyword — 1 invoke exato < N chutes.
     function W.TryStealEgg(info)
         local pos = info.Position
         Ctx.Interaction.TouchAllInRadius(pos, 14)
         Ctx.Interaction.FirePromptsInRadius(pos, 14)
         if State.UseRemotes then
+            local exact = Ctx.Remotes.GetExact({ "Packages", "Networking", "RF/EggWorld/AskFieldEggCarry" })
+            if exact then
+                Ctx.Remotes.SafeFire(exact, { Uid = info.Model.Name })
+                return true
+            end
             local stealR = Ctx.Remotes.Get("steal",
                 { "steal", "takeegg", "take_egg", "grabegg", "grab_egg", "collectegg" })
             if stealR then Ctx.Remotes.SafeFire(stealR, info.Model) end

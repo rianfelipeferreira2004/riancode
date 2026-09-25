@@ -35,9 +35,23 @@ return function(M)
     local U = Ctx.Utils
     U.bootNotify("Chilli Hub", "Iniciando... carregando UI", 4)
 
-    -- 3) Orion (pode levar segundos — antes dos loops)
+    -- 3) UI library: Orion é opt-in (State.UseOrion).
+    -- Motivo: "Orion" é nome famoso e entra em blacklist de AC
+    -- client-side; YokuHub usa UI própria pelo mesmo motivo.
+    -- Sem Orion: zero HttpGet externo, zero GUI conhecida, boot rápido.
     local bootstrap = M.OrionBootstrap(Ctx)
-    local uiMode = bootstrap.ensure() -- preenche Ctx.UI de verdade
+    local uiMode = "Native"
+    if State.UseOrion then
+        uiMode = bootstrap.ensure() -- preenche Ctx.UI de verdade
+    else
+        Ctx.UI = {
+            mode = function() return "Native" end,
+            setMode = function() end,
+            lib = function() return nil end,
+            diag = function() return "orion desativado (UseOrion=false)" end,
+            log = {},
+        }
+    end
 
     -- 4) Domínio (ordem respeita dependências lazy via Ctx)
     Ctx.Movement = M.Movement(Ctx)
@@ -80,7 +94,7 @@ return function(M)
             pcall(function() Ctx.NativeUI.build() end)
         end
         print("[ChilliHub] UI ativa: " .. tostring(uiMode)
-            .. " | " .. table.concat(bootstrap.DiagLog, " || "))
+            .. " | " .. tostring(Ctx.UI.diag and Ctx.UI.diag() or ""))
     end
 
     getgenv().ChilliHub = Ctx -- debug: getgenv().ChilliHub.State.AutoSteal = true

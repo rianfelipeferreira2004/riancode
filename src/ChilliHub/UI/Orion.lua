@@ -160,8 +160,8 @@ return function(Ctx)
         --========== PROTECAO ==========
         ProtTab:AddSection({ Name = "Bypass Anti-Cheat" })
         ProtTab:AddParagraph("Como funciona",
-            "Anti-Kick via hook + Modo Humano com delays aleatorios. Sem bypass 100% contra checagem server-side: mantenha Tween Speed e WalkSpeed moderados.")
-        ProtTab:AddToggle({ Name = "Anti-Kick", Default = true, Save = true, Flag = "AntiKick",
+            "NADA aqui liga sozinho (paridade YokuHub). Anti-Kick via hook pode ser detectado pelo AC do jogo: ligue por sua conta e risco. Sem bypass 100% contra checagem server-side: mantenha Tween Speed e WalkSpeed moderados.")
+        ProtTab:AddToggle({ Name = "Anti-Kick (hook, pode detectar)", Default = false, Save = true, Flag = "AntiKick",
             Callback = function(v) State.AntiKick = v if v then AC.Setup() end end })
         ProtTab:AddToggle({ Name = "Modo Humano (delays aleatorios)", Default = false, Save = true, Flag = "Humanized",
             Callback = function(v) State.Humanized = v end })

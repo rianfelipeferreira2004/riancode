@@ -222,7 +222,7 @@ return function(Ctx)
         button("Rejoin", function() S.TeleportService:Teleport(S.PLACE_ID, S.LocalPlayer) end)
 
         header("PROTECAO")
-        toggle("Anti-Kick", function() return State.AntiKick end,
+        toggle("Anti-Kick (hook, pode detectar)", function() return State.AntiKick end,
             function(v) State.AntiKick = v if v then AC.Setup() end end)
         toggle("Modo Humano", function() return State.Humanized end, function(v) State.Humanized = v end)
         toggle("Block Kick/Ban", function() return State.BlockKickRemotes end, function(v) State.BlockKickRemotes = v end)

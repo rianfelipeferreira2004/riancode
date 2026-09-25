@@ -27,8 +27,10 @@ return function(Ctx)
         return f
     end
 
+    -- Não cria a pasta no boot: só existe quando algum ESP liga.
+    -- (Menos objeto suspeito parado no gethui/CoreGui.)
     function E.Clear(prefix)
-        E.ensureFolder()
+        if not E.Folder or not E.Folder.Parent then return end
         for _, g in ipairs(E.Folder:GetChildren()) do
             if string.sub(g.Name, 1, #prefix) == prefix then g:Destroy() end
         end
@@ -78,6 +80,7 @@ return function(Ctx)
         task.spawn(function()
             while true do
                 if State.EggESP then
+                    E.ensureFolder()
                     pcall(function()
                         E.Clear("EGG_") E.Clear("BEST_")
                         local eggs = W.SortEggs(W.FindEggs())
@@ -106,6 +109,7 @@ return function(Ctx)
         task.spawn(function()
             while true do
                 if State.PlayerESP then
+                    E.ensureFolder()
                     pcall(function()
                         E.Clear("PLR_")
                         for _, p in ipairs(S.Players:GetPlayers()) do
@@ -156,7 +160,6 @@ return function(Ctx)
     end
 
     function E.start()
-        E.ensureFolder()
         E.startEggLoop()
         E.startPlayerLoop()
     end

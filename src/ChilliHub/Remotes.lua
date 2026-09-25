@@ -80,5 +80,24 @@ return function(Ctx)
         else Slots = {} end
     end
 
+    -- Caminho exato, sem adivinhação por keyword.
+    -- parts: lista de nomes. Ex: {"Packages","Networking","RF/EggWorld/AskFieldEggCarry"}
+    -- (nomes podem conter "/" — por isso é lista, não string splittada).
+    -- Fonte: protocolo real do jogo (cf. YOKUDO HUB open source).
+    function Rm.GetExact(parts)
+        local key = "exact:" .. table.concat(parts, ">")
+        if Slots[key] and Slots[key].Parent then return Slots[key] end
+        local node = S.ReplicatedStorage
+        for _, part in ipairs(parts) do
+            node = node and node:FindFirstChild(part)
+        end
+        if node and (node:IsA("RemoteEvent") or node:IsA("RemoteFunction")
+            or node:IsA("UnreliableRemoteEvent")) then
+            Slots[key] = node
+            return node
+        end
+        return nil
+    end
+
     return Rm
 end
