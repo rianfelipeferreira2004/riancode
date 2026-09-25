@@ -85,6 +85,7 @@ local UserInputService = cloneref(game:GetService("UserInputService"))
 local VirtualUser = cloneref(game:GetService("VirtualUser"))
 local Lighting = cloneref(game:GetService("Lighting"))
 local PathfindingService = cloneref(game:GetService("PathfindingService"))
+local GuiService = cloneref(game:GetService("GuiService"))
 
 local LocalPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
@@ -160,6 +161,8 @@ local State = {
     SafeMode = true,
     UseRemotes = true,
     UsePathfind = false,
+    SpoofProps = false,
+    AutoRejoin = true,
 }
 
 -- Listas conhecidas do jogo (podem expandir com updates)
@@ -209,15 +212,15 @@ local function HDelay(base)
     return base
 end
 
-local __ChilliHooked = false
+local __ChilliHooked, __HookNC, __HookIdx, __Watchdog, __RejoinHooked = false, false, false, false, false
 local function SetupAntiCheat(force)
     if __ChilliHooked and not force then return true end
     local applied = {}
     -- 1) namecall hook: barra Kick + (opcional) remotes suspeitos
-    if hookmetamethod and newcclosure then
+    if hookmetamethod and newcclosure and (not __HookNC or force) then
         local ok, err = pcall(function()
-            local old
-            old = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local oldNC
+            oldNC = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
                 local m = (getnamecallmethod and getnamecallmethod()) or ""
                 if State.AntiKick and m == "Kick" then
                     return nil
@@ -230,16 +233,66 @@ local function SetupAntiCheat(force)
                         return nil
                     end
                 end
-                return old(self, ...)
+                return oldNC(self, ...)
             end))
+            __HookNC = true
         end)
         if ok then table.insert(applied, "namecall") else warn("[ChilliHub] bypass namecall falhou: " .. tostring(err)) end
-    end
-    -- 2) hook direto no Kick do jogador (fallback p/ executor sem hookmetamethod)
+    elseif __HookNC then table.insert(applied, "namecall") end
+    -- 2) __index spoof: responde 16/50 p/ quem perguntar WalkSpeed/JumpPower (opt-in, com self-test)
+    if State.SpoofProps and hookmetamethod and newcclosure and (not __HookIdx or force) then
+        local ok, err = pcall(function()
+            local oldIdx
+            oldIdx = hookmetamethod(game, "__index", newcclosure(function(self, k)
+                if k == "WalkSpeed" or k == "JumpPower" or k == "JumpHeight" then
+                    local okH, isH = pcall(function() return self:IsA("Humanoid") end)
+                    if okH and isH then
+                        if k == "WalkSpeed" then return 16 end
+                        return 50
+                    end
+                end
+                return oldIdx(self, k)
+            end))
+            if oldIdx == nil then error("sem cadeia anterior") end
+            if game:GetService("Workspace").Name ~= "Workspace" then error("self-test falhou") end
+            __HookIdx = true
+        end)
+        if ok then table.insert(applied, "spoof-idx")
+        else
+            State.SpoofProps = false
+            warn("[ChilliHub] spoof desativado (incompativel): " .. tostring(err))
+        end
+    elseif __HookIdx then table.insert(applied, "spoof-idx") end
+    -- 3) hook direto no Kick do jogador (fallback p/ executor sem hookmetamethod)
     if hookfunction and newcclosure then
         pcall(function()
             hookfunction(LocalPlayer.Kick, newcclosure(function(...) return nil end))
             table.insert(applied, "kick-fn")
+        end)
+    end
+    -- 4) watchdog: mantem nossos hooks por cima (alguns ACs re-instalam os deles)
+    if not __Watchdog then
+        __Watchdog = true
+        task.spawn(function()
+            while true do
+                task.wait(120)
+                if State.AntiKick then SetupAntiCheat(true) end
+            end
+        end)
+    end
+    -- 5) auto-rejoin se a tela de disconnect aparecer
+    if not __RejoinHooked then
+        __RejoinHooked = true
+        pcall(function()
+            GuiService.ErrorMessageChanged:Connect(function(msg)
+                if not State.AutoRejoin then return end
+                if type(msg) == "string" and #msg > 0 then
+                    warn("[ChilliHub] Disconnect detectado: " .. msg)
+                    bootNotify("Chilli Hub", "Kick detectado, voltando ao jogo...", 5)
+                    task.wait(4)
+                    pcall(function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end)
+                end
+            end)
         end)
     end
     __ChilliHooked = #applied > 0
@@ -811,7 +864,11 @@ end)
 --========================================================
 local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "ChilliHubESP"
-pcall(function() ESPFolder.Parent = cloneref(game:GetService("CoreGui")) end)
+pcall(function()
+    if gethui then ESPFolder.Parent = gethui()
+    elseif get_hidden_gui then ESPFolder.Parent = get_hidden_gui()
+    else ESPFolder.Parent = cloneref(game:GetService("CoreGui")) end
+end)
 if not ESPFolder.Parent then ESPFolder.Parent = Workspace end
 
 local function ClearESP(prefix)
@@ -1120,6 +1177,10 @@ local function BuildOrionUI()
         Callback = function(v) State.UseRemotes = v end })
     ProtTab:AddToggle({ Name = "Pathfinding (anti-TP)", Default = false, Save = true, Flag = "UsePathfind",
         Callback = function(v) State.UsePathfind = v end })
+    ProtTab:AddToggle({ Name = "Spoof WalkSpeed (opt-in, teste)", Default = false, Save = true, Flag = "SpoofProps",
+        Callback = function(v) State.SpoofProps = v if v then SetupAntiCheat() end end })
+    ProtTab:AddToggle({ Name = "Auto-Rejoin no kick", Default = true, Save = true, Flag = "AutoRejoin",
+        Callback = function(v) State.AutoRejoin = v end })
     ProtTab:AddButton({ Name = "Reaplicar Bypass agora", Callback = function() SetupAntiCheat(true) end })
 
     --========== DIAGNOSTICO ==========
@@ -1319,6 +1380,8 @@ local function BuildNativeUI()
     toggle("Modo Seguro", function() return State.SafeMode end, function(v) State.SafeMode = v end)
     toggle("Usar Remotes", function() return State.UseRemotes end, function(v) State.UseRemotes = v end)
     toggle("Pathfinding", function() return State.UsePathfind end, function(v) State.UsePathfind = v end)
+    toggle("Spoof WS", function() return State.SpoofProps end, function(v) State.SpoofProps = v if v then SetupAntiCheat() end end)
+    toggle("Auto-Rejoin", function() return State.AutoRejoin end, function(v) State.AutoRejoin = v end)
     header("DIAGNOSTICO")
     button("Escanear Remotes", function()
         local n = RefreshRemotes()
