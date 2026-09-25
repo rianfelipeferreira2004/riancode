@@ -9,7 +9,7 @@
 -- trabalharmos em cima sem depender do upstream.
 -- ==================================================
 
-local BASE_URL = "https://raw.githubusercontent.com/rianfelipeferreira2004/v2/main/"
+local BASE_URL = "https://raw.githubusercontent.com/rianfelipeferreira2004/riancode/main/"
 
 _G.YOKUDO_EnablePrint = false
 
