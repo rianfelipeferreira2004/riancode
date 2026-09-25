@@ -16,10 +16,45 @@
 ]]
 
 --========================================================
---// 1. LOAD RAYFIELD
+--// 1. LOAD RAYFIELD (com fallback p/ Delta)
 --========================================================
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-if not Rayfield then warn("[ChilliHub] Falha ao carregar Rayfield."); return end
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Chilli Hub",
+        Text = "Iniciando... carregando UI",
+        Duration = 4
+    })
+end)
+
+local Rayfield
+do
+    local urls = {
+        "https://sirius.menu/rayfield",
+        "https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua",
+    }
+    local err = "desconhecido"
+    for _, u in ipairs(urls) do
+        local ok, res = pcall(function() return game:HttpGet(u) end)
+        if ok and type(res) == "string" and #res > 10000 then
+            local ok2, lib = pcall(function() return loadstring(res)() end)
+            if ok2 and lib then Rayfield = lib break end
+            err = tostring(lib)
+        else
+            err = tostring(res)
+        end
+    end
+    if not Rayfield then
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Chilli Hub ERRO",
+                Text = "Falha ao baixar Rayfield: " .. string.sub(tostring(err), 1, 120),
+                Duration = 10
+            })
+        end)
+        warn("[ChilliHub] Falha ao carregar Rayfield: " .. tostring(err))
+        return
+    end
+end
 
 --========================================================
 --// 2. SERVIÇOS / BASE
@@ -200,7 +235,7 @@ local function FirePromptsInRadius(pos, radius)
                         d:InputHoldBegin() task.wait(0.05) d:InputHoldEnd()
                     end
                 end)
-                fired += 1
+                fired = fired + 1
             end
         end
     end
@@ -222,7 +257,7 @@ local function TouchAllInRadius(pos, radius)
                             firetouchinterest(hrp, d, 0) task.wait(0.05) firetouchinterest(hrp, d, 1)
                         end
                     end)
-                    n += 1
+                    n = n + 1
                 end
             end
         end
@@ -256,7 +291,7 @@ local function ScoreRemote(remote, keywords)
     local full = string.lower(remote:GetFullName() .. " " .. remote.Name .. " " .. remote.ClassName)
     local s = 0
     for _, k in ipairs(keywords) do
-        if string.find(full, string.lower(k), 1, true) then s += 10 end
+        if string.find(full, string.lower(k), 1, true) then s = s + 10 end
     end
     return s
 end
@@ -725,7 +760,7 @@ task.spawn(function()
                     if shown >= 40 then break end
                     if (e.Position - hp).Magnitude <= State.ESPMaxDist then
                         EggBillboard(e, State.HighlightBest and e == best)
-                        shown += 1
+                        shown = shown + 1
                     end
                 end
             end)
@@ -819,7 +854,7 @@ local Window = Rayfield:CreateWindow({
     LoadingSubtitle = "by Chilli • Rayfield",
     ShowText = "Chilli Hub",
     Theme = "Default",
-    ToggleUIKeybind = Enum.KeyCode.RightShift,
+    ToggleUIKeybind = "RightShift",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
     ConfigurationSaving = {
