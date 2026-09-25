@@ -54,6 +54,38 @@ local function GetEventInfo()
 end
 
 -- ==================================================
+-- ✅ EGG PRIORITY (ovo > evento > AFK)
+-- Se o Auto AFK Farming Egg estiver ligado E houver ovo do filtro
+-- (ou VIPTP em andamento), o evento espera: não ataca e não puxa da esteira.
+-- Assim dá pra deixar "Auto Attack Drone" + "Auto AFK Farming Egg" ligados juntos.
+-- ==================================================
+local function EggHasPriority()
+    local FM = _G.YOKUDO_FarmingManager
+    if not FM then return false end
+    if not FM.IsEnabled() then return false end
+    -- VIPTP rodando = ovo em coleta
+    if _G.YOKUDO_VIPTP and _G.YOKUDO_VIPTP.IsEnabled() then
+        return true
+    end
+    -- Helper exportado pelo FarmingManager (checa WaitingForVIPTP + FindBestEgg)
+    if type(FM.HasEggPriority) == "function" then
+        local Ok, Res = pcall(function() return FM.HasEggPriority() end)
+        if Ok then return Res == true end
+    end
+    -- Fallback: varredura direta
+    if type(FM.FindBestEgg) == "function" then
+        local Ok, Best = pcall(function() return FM.FindBestEgg() end)
+        if Ok and Best ~= nil then return true end
+    end
+    return false
+end
+
+local function IsEventActiveNow()
+    local Sec, _, IsActive = GetEventInfo()
+    return IsActive == true and (Sec or 0) > EVENT_STOP_ATTACK_THRESHOLD
+end
+
+-- ==================================================
 -- FORCE STOP ALL FEATURES
 -- ==================================================
 local function ForceStopAll()
@@ -62,8 +94,15 @@ local function ForceStopAll()
     if _G.YOKUDO_AttackDrone then
         pcall(function() _G.YOKUDO_AttackDrone.Stop() end)
     end
-    if _G.YOKUDO_AFKSystem then
-        pcall(function() _G.YOKUDO_AFKSystem.Disable() end)
+    -- ✅ Não mata o AFK se o farm de ovo estiver ligado:
+    -- o AFK pertence ao FarmingManager nesse caso.
+    local FarmOn = _G.YOKUDO_FarmingManager and _G.YOKUDO_FarmingManager.IsEnabled()
+    if not FarmOn then
+        if _G.YOKUDO_AFKSystem then
+            pcall(function() _G.YOKUDO_AFKSystem.Disable() end)
+        end
+    else
+        print("[ManagerDrone] Farm de ovo ligado → mantém AFK/VIPTP")
     end
 end
 
@@ -74,6 +113,13 @@ end
 -- ==================================================
 local function SwitchAFKToAttack()
     print("[ManagerDrone] Event Detected → Switch AFK to Attack")
+
+    -- ✅ Ovo tem prioridade: se apareceu ovo do filtro no mesmo momento,
+    -- deixa o FarmingManager coletar primeiro.
+    if EggHasPriority() then
+        print("[ManagerDrone] 🥚 Ovo do filtro detectado → evento espera")
+        return
+    end
 
     -- 1. រក Treadmill Pos
     local TreadmillPos = nil
@@ -134,6 +180,26 @@ local function MainLoop()
         print("[ManagerDrone] Text:", EventText, "| Sec:", EventSec, "| IsActive:", IsEventActive, "| NotActive:", EventNotActive, "| StopAttack:", EventStopAttack, "| Active:", EventActive)
 
         -- ==================================================
+        -- ✅ PRIORIDADE DO OVO: tem ovo do filtro / VIPTP rodando?
+        -- Se sim, o evento espera: para o ataque e NÃO mexe no AFK.
+        -- Quando todos os ovos do filtro forem coletados, EggHasPriority()
+        -- volta a false e o fluxo abaixo leva pro evento sozinho.
+        -- ==================================================
+        local HasEgg = EggHasPriority()
+        if HasEgg then
+            if _G.YOKUDO_AttackDrone and _G.YOKUDO_AttackDrone.IsEnabled() then
+                print("[ManagerDrone] 🥚 Ovo prioritário → Stop Attack (evento espera)")
+                _G.YOKUDO_AttackDrone.Stop()
+            end
+            LastEventSec = EventSec
+            LastEventText = EventText
+            task.wait(EVENT_CHECK_INTERVAL)
+            continue
+        end
+
+        local FarmOn = _G.YOKUDO_FarmingManager and _G.YOKUDO_FarmingManager.IsEnabled()
+
+        -- ==================================================
         -- Event មិនទាន់ចេញ (Text = "in Xm Ys") → AFK System
         -- ==================================================
         if EventNotActive then
@@ -142,9 +208,13 @@ local function MainLoop()
                 _G.YOKUDO_AttackDrone.Stop()
             end
 
-            if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
-                print("[ManagerDrone] Event Not Active → AFK System")
-                _G.YOKUDO_AFKSystem.Enable()
+            -- ✅ Se o farm de ovo estiver ligado, quem cuida do AFK é o
+            -- FarmingManager: não força Enable aqui (evita briga esteira x ovo).
+            if not FarmOn then
+                if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
+                    print("[ManagerDrone] Event Not Active → AFK System")
+                    _G.YOKUDO_AFKSystem.Enable()
+                end
             end
         -- ==================================================
         -- Event ជិតចប់ (Sec <= 10) → Stop Attack → AFK
@@ -155,8 +225,10 @@ local function MainLoop()
                 _G.YOKUDO_AttackDrone.Stop()
             end
 
-            if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
-                _G.YOKUDO_AFKSystem.Enable()
+            if not FarmOn then
+                if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
+                    _G.YOKUDO_AFKSystem.Enable()
+                end
             end
         -- ==================================================
         -- Event ចេញ (Sec > 10) → Switch AFK → Attack
@@ -252,6 +324,9 @@ _G.YOKUDO_ManagerDrone = {
     GetEventInfo = GetEventInfo,
     ForceStopAll = ForceStopAll,
     SwitchAFKToAttack = SwitchAFKToAttack,
+    -- ✅ Lido pelo FarmingManager (prioridade ovo > evento)
+    IsEventActiveNow = IsEventActiveNow,
+    EggHasPriority = EggHasPriority,
 }
 
 print("✅ ManagerDrone Feature Loaded (Switch AFK to Attack)")

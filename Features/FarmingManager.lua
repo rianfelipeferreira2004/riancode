@@ -360,10 +360,58 @@ local function GetPhase()
 end
 
 -- ==================================================
--- STOP ALL
+-- ✅ PRIORITY HELPERS (ovo > evento > AFK)
+-- FarmingManager tem prioridade sobre o ManagerDrone:
+-- se existe ovo do filtro ou VIPTP rodando, o evento deve esperar.
 -- ==================================================
-local function StopAll()
-    if _G.YOKUDO_AFKSystem and _G.YOKUDO_AFKSystem.IsEnabled() then
+local function HasEggPriority()
+    if not FarmingEnabled then return false end
+    if WaitingForVIPTP then return true end
+    if _G.YOKUDO_VIPTP and _G.YOKUDO_VIPTP.IsEnabled() then return true end
+    local BestEgg = FindBestEgg()
+    return BestEgg ~= nil
+end
+
+-- Evento quer atacar? (espelha a regra do ManagerDrone: ativo e Sec > 10)
+local function EventWantsAttack()
+    if not _G.YOKUDO_ManagerDrone then return false end
+    if not _G.YOKUDO_ManagerDrone.IsEnabled() then return false end
+    local Ok, Sec, _, IsActive = pcall(function()
+        local S, T, A = _G.YOKUDO_ManagerDrone.GetEventInfo()
+        return S, T, A
+    end)
+    if not Ok then return false end
+    return IsActive == true and (Sec or 0) > 10
+end
+
+-- Só liga o AFK se o evento NÃO estiver pedindo ataque.
+-- Evita o bug de "voltar pra esteira" brigando com o AttackDrone.
+local function EnableAFKIfAllowed(Caller)
+    if not _G.YOKUDO_AFKSystem then return end
+    if EventWantsAttack() then
+        return
+    end
+    if not _G.YOKUDO_AFKSystem.IsEnabled() then
+        _G.YOKUDO_AFKSystem.Enable()
+        AFKStarted = true
+        print("[FarmingManager] AFK Started (" .. tostring(Caller or "?") .. ")")
+    else
+        AFKStarted = true
+    end
+end
+
+-- ==================================================
+-- STOP ALL (inclui AttackDrone: ovo tem prioridade sobre evento)
+-- ==================================================
+local function StopAll(KeepAFK, KeepAttack)
+    -- ✅ Ovo tem prioridade: para o AttackDrone do evento antes do VIPTP
+    -- (só na tomada de prioridade — Disable() passa KeepAttack=true)
+    if not KeepAttack and _G.YOKUDO_AttackDrone and _G.YOKUDO_AttackDrone.IsEnabled() then
+        pcall(function() _G.YOKUDO_AttackDrone.Stop() end)
+        print("[FarmingManager] ✅ AttackDrone Stopped (egg priority)")
+    end
+
+    if not KeepAFK and _G.YOKUDO_AFKSystem and _G.YOKUDO_AFKSystem.IsEnabled() then
         local TreadmillPos = _G.YOKUDO_AFKSystem.GetMyTreadmillPos()
         if not TreadmillPos then
             local _, Treadmill = _G.YOKUDO_AFKSystem.FindMyPlotAndTreadmill()
@@ -491,15 +539,14 @@ local function OnVIPTPComplete()
             end
         end)
     else
-        print("[FarmingManager] No New Egg → AFK")
+        print("[FarmingManager] No New Egg → AFK (ou Evento, se ativo)")
         print("[FarmingManager] AFKSystem exists:", tostring(_G.YOKUDO_AFKSystem ~= nil))
         print("[FarmingManager] AFKSystem IsEnabled:", tostring(_G.YOKUDO_AFKSystem and _G.YOKUDO_AFKSystem.IsEnabled()))
 
-        if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
-            _G.YOKUDO_AFKSystem.Enable()
-            AFKStarted = true
-            print("[FarmingManager] ✅ AFKSystem Enabled")
-        end
+        -- ✅ Se o evento estiver ativo, NÃO liga o AFK: o ManagerDrone
+        -- assume e leva pro ataque. Sem isso os dois brigam pelo voo
+        -- (bug de "voltar pra esteira").
+        EnableAFKIfAllowed("OnVIPTPComplete")
     end
 end
 
@@ -570,13 +617,13 @@ local function NightLoop()
 
             return
         else
-            if not AFKStarted then
-                if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
-                    _G.YOKUDO_AFKSystem.Enable()
-                    AFKStarted = true
-                    print("[FarmingManager] AFK Started (No Egg)")
-                end
+            -- ✅ Sincroniza com o estado real (o ManagerDrone pode ter
+            -- desligado o AFK pra levar pro evento) e só religa se o
+            -- evento NÃO estiver pedindo ataque.
+            if _G.YOKUDO_AFKSystem then
+                AFKStarted = _G.YOKUDO_AFKSystem.IsEnabled()
             end
+            EnableAFKIfAllowed("NightLoop/NoEgg")
         end
 
         task.wait(NIGHT_CHECK_INTERVAL)
@@ -615,11 +662,12 @@ local function DayLoop()
                 task.wait(0.5)
             end
         else
-            if _G.YOKUDO_AFKSystem and not _G.YOKUDO_AFKSystem.IsEnabled() then
-                _G.YOKUDO_AFKSystem.Enable()
-                AFKStarted = true
-                print("[FarmingManager] AFK Started (No Egg)")
+            -- ✅ Mesmo esquema do NightLoop: sem ovo e com evento ativo,
+            -- deixa o ManagerDrone levar pro ataque em vez de puxar pra esteira.
+            if _G.YOKUDO_AFKSystem then
+                AFKStarted = _G.YOKUDO_AFKSystem.IsEnabled()
             end
+            EnableAFKIfAllowed("DayLoop/NoEgg")
         end
 
         task.wait(DAY_CHECK_INTERVAL)
@@ -678,7 +726,10 @@ local function Disable()
         FarmingThread = nil
     end
 
-    StopAll()
+    -- ✅ Desligar o farm de ovo NÃO mata o farm de evento:
+    -- mantém o AttackDrone e mantém o AFK se o ManagerDrone estiver ligado.
+    local EventOn = _G.YOKUDO_ManagerDrone and _G.YOKUDO_ManagerDrone.IsEnabled()
+    StopAll(EventOn == true, true)
 
     AFKStarted = false
     PendingEggUid = nil
@@ -713,6 +764,9 @@ _G.YOKUDO_FarmingManager = {
     METHOD = METHOD,
     -- ✅ Callback សម្រាប់ VIPTP
     OnVIPTPComplete = OnVIPTPComplete,
+    -- ✅ Prioridade ovo > evento (lido pelo ManagerDrone)
+    HasEggPriority = HasEggPriority,
+    EventWantsAttack = EventWantsAttack,
 }
 
 -- ✅ ដក Register ចេញ — មិន Register ជាមួយ CharacterSystem
