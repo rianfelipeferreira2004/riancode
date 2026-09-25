@@ -16,7 +16,7 @@
 ]]
 
 --========================================================
---// 1. LOAD RAYFIELD (com fallback p/ Delta)
+--// 1. LOADER 3-TIER (Rayfield -> Fluent -> Nativa)
 --========================================================
 local function bootNotify(title, text, dur)
     pcall(function()
@@ -27,45 +27,76 @@ local function bootNotify(title, text, dur)
 end
 bootNotify("Chilli Hub", "Iniciando... carregando UI", 4)
 
-local Rayfield
+local UI_MODE, Rayfield, Fluent, SaveManager, InterfaceManager = "Native", nil, nil, nil, nil
+local DiagLog = {}
+
+local function tryFetch(url)
+    local ok, res = pcall(game.HttpGet, game, url)
+    if not ok then return nil, "http-FAIL" end
+    if type(res) ~= "string" or #res < 10000 then
+        return nil, "http-curto(" .. tostring(res and #res) .. "b)"
+    end
+    return res, "http-ok(" .. #res .. "b)"
+end
+
+local function tryChunk(res, name)
+    local fn, cerr = loadstring(res, name)
+    if not fn then return nil, "compile-FAIL: " .. string.sub(tostring(cerr), 1, 100) end
+    local ok, lib = pcall(fn)
+    if ok and lib then return lib, "OK" end
+    return nil, "run-FAIL: " .. string.sub(tostring(lib), 1, 110)
+end
+
 do
-    local urls = {
+    -- Tier 1: Rayfield (3 mirrors)
+    local rayUrls = {
         { "sirius", "https://sirius.menu/rayfield" },
         { "gh-raw", "https://raw.githubusercontent.com/sirius-menu/rayfield/main/source.lua" },
         { "jsdelivr", "https://cdn.jsdelivr.net/gh/sirius-menu/rayfield@main/source.lua" },
     }
-    local log = {}
-    for _, pair in ipairs(urls) do
+    for _, pair in ipairs(rayUrls) do
         local tag, u = pair[1], pair[2]
-        local ok, res = pcall(game.HttpGet, game, u)
-        if not ok then
-            table.insert(log, tag .. " http-FAIL: " .. string.sub(tostring(res), 1, 90))
-        elseif type(res) ~= "string" or #res < 10000 then
-            table.insert(log, tag .. " http-curto(" .. tostring(res and #res) .. "b): " .. string.sub(tostring(res), 1, 90))
+        local res, st = tryFetch(u)
+        if not res then
+            table.insert(DiagLog, "ray/" .. tag .. " " .. st)
         else
-            local fn, cerr = loadstring(res, "Rayfield")
-            if not fn then
-                table.insert(log, tag .. " compile-FAIL(" .. #res .. "b): " .. string.sub(tostring(cerr), 1, 110))
-            else
-                local ok2, lib = pcall(fn)
-                if ok2 and lib then
-                    Rayfield = lib
-                    table.insert(log, tag .. " OK(" .. #res .. "b)")
-                    break
-                else
-                    table.insert(log, tag .. " run-FAIL(" .. #res .. "b): " .. string.sub(tostring(lib), 1, 110))
-                end
-            end
+            local lib, st2 = tryChunk(res, "Rayfield")
+            table.insert(DiagLog, "ray/" .. tag .. " " .. st .. " " .. st2)
+            if lib then Rayfield = lib UI_MODE = "Rayfield" break end
         end
     end
-    if not Rayfield then
-        local full = "ChilliHub diag | " .. table.concat(log, " || ")
+    -- Tier 2: Fluent (UI em codigo puro, sem asset de modelo)
+    if UI_MODE ~= "Rayfield" then
+        local furls = {
+            "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua",
+            "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/main.lua",
+        }
+        for _, u in ipairs(furls) do
+            local res, st = tryFetch(u)
+            if not res then
+                table.insert(DiagLog, "fluent " .. st)
+            else
+                local lib, st2 = tryChunk(res, "Fluent")
+                table.insert(DiagLog, "fluent " .. st .. " " .. st2)
+                if lib then Fluent = lib UI_MODE = "Fluent" break end
+            end
+        end
+        if UI_MODE == "Fluent" then
+            local okS, sm = pcall(function()
+                return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+            end)
+            local okI, im = pcall(function()
+                return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+            end)
+            if okS and sm then SaveManager = sm end
+            if okI and im then InterfaceManager = im end
+        end
+    end
+    local full = "ChilliHub diag | " .. table.concat(DiagLog, " || ")
+    print("[ChilliHub] " .. full)
+    if UI_MODE == "Native" then
         pcall(function() if setclipboard then setclipboard(full) end end)
-        warn("[ChilliHub] " .. full)
-        bootNotify("Chilli Hub ERRO", "Falha ao baixar Rayfield (diag copiado).", 8)
-        task.wait(0.5)
-        bootNotify("Chilli Hub ERRO 2/2", string.sub(table.concat(log, " || "), 1, 200), 10)
-        return
+        bootNotify("Chilli Hub", "Rayfield/Fluent falharam: usando UI NATIVA (diag copiado).", 8)
     end
 end
 
@@ -87,9 +118,18 @@ local LocalPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
 
 local function Notify(title, content, dur)
-    pcall(function()
-        Rayfield:Notify({ Title = tostring(title), Content = tostring(content), Duration = dur or 4, Image = 4483362458 })
-    end)
+    dur = dur or 4
+    if UI_MODE == "Rayfield" and Rayfield then
+        pcall(function()
+            Rayfield:Notify({ Title = tostring(title), Content = tostring(content), Duration = dur, Image = 4483362458 })
+        end)
+    elseif UI_MODE == "Fluent" and Fluent then
+        pcall(function()
+            Fluent:Notify({ Title = tostring(title), Content = tostring(content), Duration = dur })
+        end)
+    else
+        bootNotify(title, content, dur)
+    end
 end
 
 local function HRP()
@@ -859,8 +899,9 @@ task.spawn(function()
 end)
 
 --========================================================
---// 9. JANELA RAYFIELD + SAVE CONFIG
+--// 9. UI BUILDERS (Rayfield / Fluent / Nativa)
 --========================================================
+local function BuildRayfieldUI()
 local Window = Rayfield:CreateWindow({
     Name = "Chilli Hub | Steal an Egg",
     Icon = 0,
@@ -1059,3 +1100,356 @@ Rayfield:Notify({ Title = "Chilli Hub", Content = "Carregado! Config salva em Ch
 print("[ChilliHub] Rayfield + SaveConfig carregado. PlaceId:", PLACE_ID)
 
 Rayfield:LoadConfiguration()
+end -- BuildRayfieldUI
+
+--========== BUILDER FLUENT (fallback, Dark + SaveManager) ==========
+local function BuildFluentUI()
+    if not Fluent then return end
+    local Window = Fluent:CreateWindow({
+        Title = "Chilli Hub | Steal an Egg",
+        SubTitle = "by Chilli - Fluent Dark (fallback)",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(580, 460),
+        Acrylic = true,
+        Theme = "Dark",
+        MinimizeKey = Enum.KeyCode.RightShift
+    })
+    local Tabs = {
+        Farm = Window:AddTab({ Title = "Farm", Icon = "zap" }),
+        Pets = Window:AddTab({ Title = "Pets", Icon = "bird" }),
+        Treino = Window:AddTab({ Title = "Treino", Icon = "activity" }),
+        Visual = Window:AddTab({ Title = "Visual", Icon = "eye" }),
+        Jogador = Window:AddTab({ Title = "Jogador", Icon = "user" }),
+        Diag = Window:AddTab({ Title = "Diagnostico", Icon = "info" }),
+        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    }
+    local Options = Fluent.Options
+    local function MultiToArrayF(v)
+        local out = {}
+        if type(v) ~= "table" then return out end
+        local isDict = false
+        for _, s in pairs(v) do if type(s) == "boolean" then isDict = true break end end
+        if isDict then for k, s in pairs(v) do if s then table.insert(out, k) end end
+        else for _, s in ipairs(v) do table.insert(out, s) end end
+        return out
+    end
+    Tabs.Farm:AddParagraph({ Title = "Roubo automatico (modo fallback Fluent)", Content = "Rayfield falhou neste executor; mesmos recursos aqui." })
+    Tabs.Farm:AddToggle("AutoSteal", { Title = "Auto Steal (com filtros)", Default = false })
+    Tabs.Farm:AddToggle("AutoStealAll", { Title = "Auto Steal TUDO", Default = false })
+    Tabs.Farm:AddToggle("AutoReturn", { Title = "Auto Voltar pra Base", Default = true })
+    Tabs.Farm:AddToggle("AutoSnipe", { Title = "Snipe Raros", Default = false })
+    Tabs.Farm:AddToggle("SmartTween", { Title = "Smart Tween + NoClip", Default = true })
+    Options.AutoSteal:OnChanged(function() State.AutoSteal = Options.AutoSteal.Value end)
+    Options.AutoStealAll:OnChanged(function() State.AutoStealAll = Options.AutoStealAll.Value end)
+    Options.AutoReturn:OnChanged(function() State.AutoReturn = Options.AutoReturn.Value end)
+    Options.AutoSnipe:OnChanged(function() State.AutoSnipe = Options.AutoSnipe.Value end)
+    Options.SmartTween:OnChanged(function() State.SmartTween = Options.SmartTween.Value end)
+    Tabs.Farm:AddSlider("TweenSpeed", { Title = "Tween Speed", Default = 220, Min = 60, Max = 600, Rounding = 0 })
+    Tabs.Farm:AddSlider("StealDelay", { Title = "Delay roubos", Default = 0.35, Min = 0.1, Max = 2, Rounding = 2 })
+    Options.TweenSpeed:OnChanged(function(v) State.TweenSpeed = v end)
+    Options.StealDelay:OnChanged(function(v) State.StealDelay = v end)
+    local Z2 = Tabs.Farm:AddDropdown("FilterZones", { Title = "Zonas", Values = ALL_ZONES, Multi = true, Default = {} })
+    local R2 = Tabs.Farm:AddDropdown("FilterRarities", { Title = "Raridades", Values = ALL_RARITIES, Multi = true, Default = {} })
+    local M2 = Tabs.Farm:AddDropdown("FilterMutations", { Title = "Mutacoes", Values = ALL_MUTATIONS, Multi = true, Default = {} })
+    local P2 = Tabs.Farm:AddDropdown("Priority", { Title = "Prioridade", Values = { "Mais Raro", "Mais Proximo", "Mais Distante", "Maior Tamanho" }, Multi = false, Default = 1 })
+    Z2:OnChanged(function(v) State.FilterZones = MultiToArrayF(v) end)
+    R2:OnChanged(function(v) State.FilterRarities = MultiToArrayF(v) end)
+    M2:OnChanged(function(v) State.FilterMutations = MultiToArrayF(v) end)
+    P2:OnChanged(function(v) State.Priority = (type(v) == "table" and v[1]) or v end)
+    Tabs.Farm:AddButton({ Title = "Roubar melhor ovo AGORA", Callback = function()
+        task.spawn(function()
+            local eggs = SortEggs(FindEggs())
+            local t = eggs[1]
+            if t then TweenTo(CFrame.new(t.Position + Vector3.new(0, 4, 0))) TryStealEgg(t) Notify("Steal", t.Name .. " | " .. t.Rarity)
+            else Notify("Steal", "Nenhum ovo encontrado") end
+        end)
+    end })
+    Tabs.Farm:AddButton({ Title = "Voltar pra Base AGORA", Callback = function()
+        task.spawn(function()
+            local cf = GetMyBaseCFrame()
+            if cf then TweenTo(cf + Vector3.new(0, 5, 0)) FirePromptsInRadius(cf.Position, 20) Notify("Base", "Entregue / prompt ativado")
+            else Notify("Base", "Base nao encontrada") end
+        end)
+    end })
+    Tabs.Pets:AddToggle("AutoHatch", { Title = "Auto Hatch", Default = false })
+    Tabs.Pets:AddToggle("AutoEquipBest", { Title = "Auto Equipar Melhor", Default = false })
+    Options.AutoHatch:OnChanged(function() State.AutoHatch = Options.AutoHatch.Value end)
+    Options.AutoEquipBest:OnChanged(function() State.AutoEquipBest = Options.AutoEquipBest.Value end)
+    Tabs.Pets:AddSlider("HatchDelay", { Title = "Delay Hatch", Default = 0.5, Min = 0.2, Max = 5, Rounding = 1 })
+    Options.HatchDelay:OnChanged(function(v) State.HatchDelay = v end)
+    local HI = Tabs.Pets:AddInput("HatchEgg", { Title = "Ovo p/ Hatch", Default = "All", Placeholder = "Ex: Cosmic / All", Numeric = false, Finished = false })
+    HI:OnChanged(function() State.HatchEgg = (Options.HatchEgg.Value == "" and "All" or Options.HatchEgg.Value) end)
+    Tabs.Pets:AddButton({ Title = "Equipar Melhor AGORA", Callback = function()
+        local eq = GetRemote("equip", { "equipbest", "equip_best", "equip", "bestpet" })
+        if eq then SafeFire(eq, "Best") Notify("Pets", "Equip Best disparado") else Notify("Pets", "Remote nao achado") end
+    end })
+    Tabs.Pets:AddButton({ Title = "Chocar 1x AGORA", Callback = function()
+        local h = GetRemote("hatch", { "hatch", "openegg", "open_egg", "unbox" })
+        if h then SafeFire(h, State.HatchEgg) Notify("Hatch", "Disparado: " .. tostring(State.HatchEgg))
+        else local cf = GetHatchCFrame() if cf then TweenTo(cf) FirePromptsInRadius(cf.Position, 20) end end
+    end })
+    Tabs.Treino:AddToggle("AutoTrain", { Title = "Auto Treinar", Default = false })
+    Tabs.Treino:AddToggle("AutoUpTread", { Title = "Auto Upgrade Treadmill", Default = false })
+    Tabs.Treino:AddToggle("AutoUpBase", { Title = "Auto Upgrade Base", Default = false })
+    Tabs.Treino:AddToggle("AutoCollect", { Title = "Auto Coletar", Default = false })
+    Options.AutoTrain:OnChanged(function() State.AutoTrain = Options.AutoTrain.Value end)
+    Options.AutoUpTread:OnChanged(function() State.AutoUpgradeTreadmill = Options.AutoUpTread.Value end)
+    Options.AutoUpBase:OnChanged(function() State.AutoUpgradeBase = Options.AutoUpBase.Value end)
+    Options.AutoCollect:OnChanged(function() State.AutoCollect = Options.AutoCollect.Value end)
+    Tabs.Treino:AddSlider("CollectDelay", { Title = "Delay coleta", Default = 2, Min = 1, Max = 30, Rounding = 1 })
+    Options.CollectDelay:OnChanged(function(v) State.CollectDelay = v end)
+    Tabs.Treino:AddButton({ Title = "Ir pra Treadmill", Callback = function()
+        local cf = GetTreadmillCFrame()
+        if cf then TweenTo(cf) else Notify("Treino", "Treadmill nao achada") end
+    end })
+    Tabs.Visual:AddToggle("EggESP", { Title = "Egg ESP", Default = false })
+    Tabs.Visual:AddToggle("HighlightBest", { Title = "Destacar melhor ovo", Default = true })
+    Tabs.Visual:AddToggle("PlayerESP", { Title = "Player ESP", Default = false })
+    Options.EggESP:OnChanged(function() State.EggESP = Options.EggESP.Value end)
+    Options.HighlightBest:OnChanged(function() State.HighlightBest = Options.HighlightBest.Value end)
+    Options.PlayerESP:OnChanged(function() State.PlayerESP = Options.PlayerESP.Value end)
+    Tabs.Visual:AddSlider("ESPMaxDist", { Title = "Dist max ESP", Default = 1500, Min = 200, Max = 5000, Rounding = 0 })
+    Options.ESPMaxDist:OnChanged(function(v) State.ESPMaxDist = v end)
+    Tabs.Visual:AddButton({ Title = "Limpar ESP", Callback = function() ClearESP("EGG_") ClearESP("BEST_") ClearESP("PLR_") end })
+    Tabs.Jogador:AddToggle("WSEnabled", { Title = "WalkSpeed custom", Default = false })
+    Options.WSEnabled:OnChanged(function() State.WSEnabled = Options.WSEnabled.Value end)
+    Tabs.Jogador:AddSlider("WalkSpeed", { Title = "WalkSpeed", Default = 16, Min = 16, Max = 250, Rounding = 0 })
+    Options.WalkSpeed:OnChanged(function(v) State.WalkSpeed = v end)
+    Tabs.Jogador:AddToggle("JPEnabled", { Title = "Jump custom", Default = false })
+    Options.JPEnabled:OnChanged(function() State.JPEnabled = Options.JPEnabled.Value end)
+    Tabs.Jogador:AddSlider("JumpPower", { Title = "JumpPower", Default = 50, Min = 50, Max = 400, Rounding = 0 })
+    Options.JumpPower:OnChanged(function(v) State.JumpPower = v end)
+    Tabs.Jogador:AddToggle("NoclipT", { Title = "NoClip", Default = false })
+    Options.NoclipT:OnChanged(function() SetNoclip(Options.NoclipT.Value) end)
+    Tabs.Jogador:AddToggle("Godmode", { Title = "Godmode", Default = false })
+    Options.Godmode:OnChanged(function() State.Godmode = Options.Godmode.Value end)
+    Tabs.Jogador:AddToggle("AntiAFK", { Title = "Anti-AFK", Default = true })
+    Options.AntiAFK:OnChanged(function() State.AntiAFK = Options.AntiAFK.Value end)
+    Tabs.Jogador:AddButton({ Title = "Server Hop", Callback = ServerHop })
+    Tabs.Jogador:AddButton({ Title = "Rejoin", Callback = function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end })
+    Tabs.Jogador:AddButton({ Title = "FPS Boost", Callback = function()
+        pcall(function()
+            Lighting.GlobalShadows = false Lighting.FogEnd = 1e9
+            for _, v in ipairs(Lighting:GetChildren()) do if v:IsA("PostEffect") or v:IsA("Atmosphere") then v.Enabled = false end end
+            for _, o in ipairs(Workspace:GetDescendants()) do
+                if o:IsA("ParticleEmitter") or o:IsA("Trail") then o.Enabled = false end
+            end
+            Notify("FPS", "Boost aplicado")
+        end)
+    end })
+    Tabs.Diag:AddButton({ Title = "Escanear Remotes", Callback = function()
+        local n = RefreshRemotes()
+        Notify("Remotes", "Achados: " .. n, 6)
+    end })
+    Tabs.Diag:AddButton({ Title = "Escanear Mapa", Callback = function()
+        local eggs = FindEggs()
+        local bcf = GetMyBaseCFrame()
+        Notify("Mapa", ("Ovos: %d | Base: %s"):format(#eggs, bcf and "OK" or "NAO"), 6)
+    end })
+    if SaveManager and InterfaceManager then
+        SaveManager:SetLibrary(Fluent)
+        InterfaceManager:SetLibrary(Fluent)
+        SaveManager:IgnoreThemeSettings()
+        SaveManager:SetIgnoreIndexes({})
+        InterfaceManager:SetFolder("ChilliHub")
+        SaveManager:SetFolder("ChilliHub/StealAnEgg")
+        InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+        SaveManager:BuildConfigSection(Tabs.Settings)
+    end
+    Window:SelectTab(1)
+    RefreshRemotes()
+    Notify("Chilli Hub", "Carregado no modo Fluent (fallback).", 5)
+    print("[ChilliHub] Fluent fallback carregado. PlaceId:", PLACE_ID)
+    if SaveManager then SaveManager:LoadAutoloadConfig() end
+end -- BuildFluentUI
+
+--========== BUILDER UI NATIVA (zero dependencia, sempre funciona) ==========
+local function BuildNativeUI()
+    local parent = nil
+    pcall(function()
+        if gethui then parent = gethui()
+        elseif game:GetService("CoreGui") then parent = game:GetService("CoreGui") end
+    end)
+    if not parent then parent = LocalPlayer:WaitForChild("PlayerGui") end
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "ChilliHubNative"
+    gui.ResetOnSpawn = false
+    gui.Parent = parent
+    local main = Instance.new("Frame")
+    main.Name = "Main"
+    main.Size = UDim2.new(0, 420, 0, 360)
+    main.Position = UDim2.new(0.5, -210, 0.5, -180)
+    main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    main.BorderSizePixel = 0
+    main.Active = true
+    main.Parent = gui
+    local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 8) corner.Parent = main
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -40, 0, 32)
+    title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    title.Text = "Chilli Hub | Steal an Egg (NATIVA)"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.FontWeight.Bold
+    title.TextSize = 14
+    title.Parent = main
+    -- arrastar pela barra
+    do
+        local drag, start, pos0 = false, nil, nil
+        title.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                drag, start, pos0 = true, i.Position, main.Position
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local d = i.Position - start
+                main.Position = UDim2.new(pos0.X.Scale, pos0.X.Offset + d.X, pos0.Y.Scale, pos0.Y.Offset + d.Y)
+            end
+        end)
+    end
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 40, 0, 32) close.Position = UDim2.new(1, -40, 0, 0)
+    close.Text = "X" close.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
+    close.TextColor3 = Color3.fromRGB(255, 255, 255) close.Font = Enum.FontWeight.Bold close.TextSize = 14
+    close.Parent = main
+    close.MouseButton1Click:Connect(function() gui:Destroy() end)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -10, 1, -42) scroll.Position = UDim2.new(0, 5, 0, 37)
+    scroll.BackgroundTransparency = 1 scroll.ScrollBarThickness = 5
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0) scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = main
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4) layout.SortOrder = Enum.SortOrder.LayoutOrder layout.Parent = scroll
+    local function header(t)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(1, -6, 0, 22) l.BackgroundTransparency = 1
+        l.Text = "== " .. t .. " ==" l.TextColor3 = Color3.fromRGB(90, 200, 255)
+        l.Font = Enum.FontWeight.Bold l.TextSize = 13 l.Parent = scroll
+    end
+    local function toggle(name, get, set)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, -6, 0, 28) b.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        b.TextColor3 = Color3.fromRGB(255, 255, 255) b.Font = Enum.FontWeight.Medium b.TextSize = 13
+        b.Parent = scroll
+        local function paint() b.Text = (get() and "[ON] " or "[OFF] ") .. name end
+        paint()
+        b.MouseButton1Click:Connect(function() set(not get()) paint() end)
+        return b
+    end
+    local function button(name, cb)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, -6, 0, 28) b.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
+        b.Text = name b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Font = Enum.FontWeight.Medium b.TextSize = 13 b.Parent = scroll
+        b.MouseButton1Click:Connect(function() task.spawn(cb) end)
+    end
+    local function numbox(name, get, set)
+        local f = Instance.new("Frame")
+        f.Size = UDim2.new(1, -6, 0, 28) f.BackgroundTransparency = 1 f.Parent = scroll
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(0.55, 0, 1, 0) l.BackgroundTransparency = 1
+        l.Text = name l.TextColor3 = Color3.fromRGB(220, 220, 220) l.TextSize = 13
+        l.Font = Enum.FontWeight.Medium l.TextXAlignment = Enum.TextXAlignment.Left l.Parent = f
+        local t = Instance.new("TextBox")
+        t.Size = UDim2.new(0.45, 0, 1, 0) t.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        t.Text = tostring(get()) t.TextColor3 = Color3.fromRGB(255, 255, 255) t.TextSize = 13
+        t.ClearTextOnFocus = false t.Parent = f
+        t.FocusLost:Connect(function(enter)
+            if enter then local v = tonumber(t.Text) if v then set(v) end t.Text = tostring(get()) end
+        end)
+    end
+    local function cycle(name, options, get, set)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, -6, 0, 28) b.BackgroundColor3 = Color3.fromRGB(70, 60, 30)
+        b.TextColor3 = Color3.fromRGB(255, 255, 255) b.Font = Enum.FontWeight.Medium b.TextSize = 13
+        b.Parent = scroll
+        local function paint() b.Text = name .. ": " .. tostring(get()) end
+        paint()
+        b.MouseButton1Click:Connect(function()
+            local cur, idx = get(), 1
+            for i, v in ipairs(options) do if v == cur then idx = i break end end
+            set(options[(idx % #options) + 1]) paint()
+        end)
+    end
+    header("FARM")
+    toggle("Auto Steal (filtros)", function() return State.AutoSteal end, function(v) State.AutoSteal = v end)
+    toggle("Auto Steal TUDO", function() return State.AutoStealAll end, function(v) State.AutoStealAll = v end)
+    toggle("Auto Voltar Base", function() return State.AutoReturn end, function(v) State.AutoReturn = v end)
+    toggle("Snipe Raros", function() return State.AutoSnipe end, function(v) State.AutoSnipe = v end)
+    numbox("Tween Speed", function() return State.TweenSpeed end, function(v) State.TweenSpeed = v end)
+    numbox("Delay roubos", function() return State.StealDelay end, function(v) State.StealDelay = v end)
+    cycle("Prioridade", { "Mais Raro", "Mais Proximo", "Mais Distante", "Maior Tamanho" }, function() return State.Priority end, function(v) State.Priority = v end)
+    button("Roubar melhor ovo AGORA", function()
+        local eggs = SortEggs(FindEggs())
+        local t = eggs[1]
+        if t then TweenTo(CFrame.new(t.Position + Vector3.new(0, 4, 0))) TryStealEgg(t) Notify("Steal", t.Name .. " | " .. t.Rarity)
+        else Notify("Steal", "Nenhum ovo encontrado") end
+    end)
+    button("Voltar pra Base AGORA", function()
+        local cf = GetMyBaseCFrame()
+        if cf then TweenTo(cf + Vector3.new(0, 5, 0)) FirePromptsInRadius(cf.Position, 20) end
+    end)
+    header("PETS")
+    toggle("Auto Hatch", function() return State.AutoHatch end, function(v) State.AutoHatch = v end)
+    toggle("Auto Equipar Melhor", function() return State.AutoEquipBest end, function(v) State.AutoEquipBest = v end)
+    numbox("Delay Hatch", function() return State.HatchDelay end, function(v) State.HatchDelay = v end)
+    button("Chocar 1x AGORA", function()
+        local h = GetRemote("hatch", { "hatch", "openegg", "open_egg", "unbox" })
+        if h then SafeFire(h, State.HatchEgg) Notify("Hatch", "Disparado") end
+    end)
+    button("Equipar Melhor AGORA", function()
+        local eq = GetRemote("equip", { "equipbest", "equip_best", "equip", "bestpet" })
+        if eq then SafeFire(eq, "Best") end
+    end)
+    header("TREINO")
+    toggle("Auto Treinar", function() return State.AutoTrain end, function(v) State.AutoTrain = v end)
+    toggle("Auto Up Treadmill", function() return State.AutoUpgradeTreadmill end, function(v) State.AutoUpgradeTreadmill = v end)
+    toggle("Auto Up Base", function() return State.AutoUpgradeBase end, function(v) State.AutoUpgradeBase = v end)
+    toggle("Auto Coletar", function() return State.AutoCollect end, function(v) State.AutoCollect = v end)
+    button("Ir pra Treadmill", function()
+        local cf = GetTreadmillCFrame()
+        if cf then TweenTo(cf) end
+    end)
+    header("VISUAL / JOGADOR")
+    toggle("Egg ESP", function() return State.EggESP end, function(v) State.EggESP = v end)
+    toggle("Player ESP", function() return State.PlayerESP end, function(v) State.PlayerESP = v end)
+    toggle("WalkSpeed custom", function() return State.WSEnabled end, function(v) State.WSEnabled = v end)
+    numbox("WalkSpeed", function() return State.WalkSpeed end, function(v) State.WalkSpeed = v end)
+    toggle("NoClip", function() return State.NoClip end, function(v) SetNoclip(v) end)
+    toggle("Godmode", function() return State.Godmode end, function(v) State.Godmode = v end)
+    button("Server Hop", ServerHop)
+    button("Rejoin", function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end)
+    header("DIAGNOSTICO")
+    button("Escanear Remotes", function()
+        local n = RefreshRemotes()
+        Notify("Remotes", "Achados: " .. n, 6)
+    end)
+    button("Escanear Mapa", function()
+        local eggs = FindEggs()
+        Notify("Mapa", "Ovos: " .. #eggs, 6)
+    end)
+    RefreshRemotes()
+    Notify("Chilli Hub", "Carregado na UI NATIVA (fallback).", 5)
+    print("[ChilliHub] UI nativa carregada. PlaceId:", PLACE_ID)
+end -- BuildNativeUI
+
+--========== SELETOR FINAL ==========
+RefreshRemotes()
+do
+    local built = false
+    if UI_MODE == "Rayfield" then
+        built = pcall(BuildRayfieldUI)
+        if not built then UI_MODE = "Fluent" end
+    end
+    if UI_MODE == "Fluent" then
+        built = pcall(BuildFluentUI)
+        if not built then UI_MODE = "Native" end
+    end
+    if UI_MODE == "Native" then
+        pcall(BuildNativeUI)
+    end
+    print("[ChilliHub] UI ativa: " .. tostring(UI_MODE) .. " | " .. table.concat(DiagLog, " || "))
+end
