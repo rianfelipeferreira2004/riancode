@@ -311,11 +311,12 @@ end
 
 local function SafeFire(remote, ...)
     if not remote then return false end
+    local args = table.pack(...)
     local ok = false
     if remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent") then
-        ok = pcall(function() remote:FireServer(...) end)
+        ok = pcall(function() remote:FireServer(table.unpack(args, 1, args.n)) end)
     elseif remote:IsA("RemoteFunction") then
-        ok = pcall(function() remote:InvokeServer(...) end)
+        ok = pcall(function() remote:InvokeServer(table.unpack(args, 1, args.n)) end)
     end
     return ok
 end
