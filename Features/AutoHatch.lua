@@ -221,6 +221,53 @@ local function SafeFire(remote, args)
 end
 
 --==================================================
+-- CICLO UNICO (usado pelo loop E pelo FarmingManager/AFK)
+-- 1) prompts onde estou (cobre ovo chocado na plot);
+-- 2) voa ao ponto de hatch + prompts + 1 remote opt-in.
+--==================================================
+local function HatchOnce()
+    local Root = GetRoot()
+    -- 1) abre o que chocou por perto (ex: na plot apos entregar)
+    if Root then
+        local n = FirePrompts(Root.Position, 25)
+        if n > 0 then
+            print("[YOKUDO] AutoHatch: prompts proximos ativados: " .. n)
+        end
+    end
+    -- 2) ponto de hatch
+    if not HatchPoint and tick() - LastScan > 30 then
+        ScanHatchPoint()
+    end
+    if not HatchPoint then return false end
+    local R = GetRoot()
+    if R and (R.Position - HatchPoint).Magnitude > 12 then
+        local Arrived = false
+        FlyTo(HatchPoint, function(ok) Arrived = ok end)
+        local Waited = 0
+        while not Arrived and Waited < 35 and Enabled do
+            task.wait(0.5)
+            Waited = Waited + 0.5
+        end
+        if not Arrived then return false end
+        R = GetRoot()
+    end
+    if not Enabled then return false end
+    local n = FirePrompts(HatchPoint, 20)
+    if n > 0 then
+        print("[YOKUDO] AutoHatch: prompts ativados: " .. n)
+    end
+    if RemoteAssist then
+        local r = ScanHatchRemote()
+        if r then
+            VariantIndex = (VariantIndex % #RemoteVariants) + 1
+            SafeFire(r, RemoteVariants[VariantIndex])
+            task.wait(0.3)
+        end
+    end
+    return true
+end
+
+--==================================================
 -- MAIN LOOP
 --==================================================
 
@@ -229,39 +276,14 @@ local function Loop()
     LoopRunning = true
     task.spawn(function()
         while Enabled do
-            -- (re)descobre ponto a cada 30s se ainda nao achou
             if not HatchPoint and tick() - LastScan > 30 then
                 ScanHatchPoint()
                 if not HatchPoint then
                     print("[YOKUDO] AutoHatch: ponto de hatch nao achado, tentando de novo em 30s")
-                    task.wait(5)
                 end
             end
             if HatchPoint then
-                local Root = GetRoot()
-                if Root and (Root.Position - HatchPoint).Magnitude > 12 then
-                    local Arrived = false
-                    FlyTo(HatchPoint, function(ok) Arrived = ok end)
-                    local Waited = 0
-                    while not Arrived and Waited < 35 and Enabled do
-                        task.wait(0.5)
-                        Waited = Waited + 0.5
-                    end
-                else
-                    local n = FirePrompts(HatchPoint, 20)
-                    if n > 0 then
-                        print("[YOKUDO] AutoHatch: prompts ativados: " .. n)
-                    end
-                    if RemoteAssist then
-                        local r = ScanHatchRemote()
-                        if r then
-                            -- 1 variante por ciclo, rodiziando (nunca rajada)
-                            VariantIndex = (VariantIndex % #RemoteVariants) + 1
-                            SafeFire(r, RemoteVariants[VariantIndex])
-                            task.wait(0.3)
-                        end
-                    end
-                end
+                HatchOnce()
             end
             task.wait(math.clamp(HatchDelay, 0.3, 10))
         end
@@ -293,6 +315,7 @@ _G.YOKUDO_AutoHatch = {
     Enable = Enable,
     Disable = Disable,
     IsEnabled = function() return Enabled end,
+    HatchOnce = HatchOnce,
     SetRemoteAssist = function(v) RemoteAssist = v and true or false end,
     IsRemoteAssist = function() return RemoteAssist end,
     SetDelay = function(v) HatchDelay = math.clamp(tonumber(v) or 1, 0.3, 10) end,

@@ -52,6 +52,38 @@ local function IsCarrying()
     return drop.Enabled == true
 end
 
+-- Acha MINHA plot (mesmo protocolo do AFKSystem).
+-- Retorna Vector3 (pivot +2y) ou nil.
+local function GetMyPlotPosition()
+    local pos = nil
+    pcall(function()
+        local Plots = workspace:FindFirstChild("Plots")
+        if not Plots then return end
+        for _, plot in ipairs(Plots:GetChildren()) do
+            if plot:IsA("Model") then
+                local sign = plot:FindFirstChild("PlotSign")
+                local ps = sign and sign:FindFirstChild("PlayerPlotSign")
+                local frame = ps and ps:FindFirstChild("Frame")
+                local nameLbl = frame and frame:FindFirstChild("PlayerName")
+                if nameLbl and nameLbl:IsA("TextLabel")
+                    and (nameLbl.Text == Player.Name or nameLbl.Text == Player.DisplayName) then
+                    local ok, cf = pcall(function() return plot:GetPivot() end)
+                    if ok and cf then
+                        pos = (cf + Vector3.new(0, 2, 0)).Position
+                    end
+                    break
+                end
+            end
+        end
+    end)
+    return pos
+end
+
+-- Destino de entrega: minha plot se achou, senao PlacePos.
+local function ResolveTarget()
+    return GetMyPlotPosition() or PlacePos
+end
+
 local function CleanupMovers()
     if FlyConnection then
         FlyConnection:Disconnect()
@@ -186,6 +218,36 @@ local function FirePrompts(Center, Radius)
 end
 
 --==================================================
+-- CICLO UNICO (usado pelo loop E pelo FarmingManager/AFK)
+-- Voa ate a plot, ativa prompts, confirma entrega.
+-- Retorna true se terminou sem ovo na mao.
+--==================================================
+local function PlaceOnce(timeoutSec)
+    timeoutSec = timeoutSec or 40
+    if not IsCarrying() then return true end
+    local target = ResolveTarget()
+    print("[YOKUDO] AutoPlace: carregando ovo -> indo entregar")
+    local Arrived = false
+    FlyTo(target, function(ok) Arrived = ok end)
+    local Waited = 0
+    while not Arrived and Waited < timeoutSec and IsCarrying() do
+        task.wait(0.5)
+        Waited = Waited + 0.5
+    end
+    if not Arrived then return false end
+    local n = FirePrompts(target, PromptRadius)
+    print("[YOKUDO] AutoPlace: prompts ativados: " .. n)
+    task.wait(1.5)
+    if not IsCarrying() then
+        print("[YOKUDO] AutoPlace: ovo entregue!")
+        return true
+    end
+    FirePrompts(target, PromptRadius + 10)
+    task.wait(1.5)
+    return not IsCarrying()
+end
+
+--==================================================
 -- MAIN LOOP
 --==================================================
 
@@ -195,25 +257,7 @@ local function Loop()
     task.spawn(function()
         while Enabled do
             if IsCarrying() then
-                print("[YOKUDO] AutoPlace: carregando ovo -> indo entregar")
-                local Arrived = false
-                FlyTo(PlacePos, function(ok) Arrived = ok end)
-                local Waited = 0
-                while not Arrived and Waited < 35 and Enabled do
-                    task.wait(0.5)
-                    Waited = Waited + 0.5
-                end
-                if Enabled and Arrived then
-                    local n = FirePrompts(PlacePos, PromptRadius)
-                    print("[YOKUDO] AutoPlace: prompts ativados: " .. n)
-                    task.wait(1.5)
-                    if not IsCarrying() then
-                        print("[YOKUDO] AutoPlace: ovo entregue!")
-                    else
-                        FirePrompts(PlacePos, PromptRadius + 10)
-                        task.wait(1.5)
-                    end
-                end
+                PlaceOnce()
             else
                 task.wait(0.5)
             end
@@ -245,6 +289,8 @@ _G.YOKUDO_AutoPlaceEgg = {
     Enable = Enable,
     Disable = Disable,
     IsEnabled = function() return Enabled end,
+    PlaceOnce = PlaceOnce,
+    GetMyPlotPosition = GetMyPlotPosition,
     SetPlacePosition = function(v3) PlacePos = v3 end,
     GetPlacePosition = function() return PlacePos end,
     SetSpeed = function(v)

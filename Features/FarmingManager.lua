@@ -464,6 +464,18 @@ local function OnVIPTPComplete()
     AFKStarted = false  -- ✅ Reset AFKStarted ដើម្បីឲ្យវាត្រឡប់ទៅ AFK វិញ
     print("[FarmingManager] ✅ VIPTP Completed → Check New Egg")
 
+    -- ✅ Loop AFK fechado: coloca o ovo na plot e abre o que chocou
+    -- (só roda se os toggles estiverem ligados na tab Auto Farming)
+    if _G.YOKUDO_AutoPlaceEgg and _G.YOKUDO_AutoPlaceEgg.IsEnabled() then
+        print("[FarmingManager] → AutoPlace no loop AFK")
+        pcall(function() _G.YOKUDO_AutoPlaceEgg.PlaceOnce() end)
+    end
+    if _G.YOKUDO_AutoHatch and _G.YOKUDO_AutoHatch.IsEnabled() then
+        print("[FarmingManager] → AutoHatch no loop AFK")
+        pcall(function() _G.YOKUDO_AutoHatch.HatchOnce() end)
+    end
+    if not FarmingEnabled then return end
+
     local BestEgg = FindBestEgg()
 
     if BestEgg then
