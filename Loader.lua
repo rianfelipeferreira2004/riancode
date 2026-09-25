@@ -228,10 +228,18 @@ loadstring(GetScript("Features/FarmingManager.lua"))()
 Loading.Update(60)
 loadstring(GetScript("Features/ConfigSystem.lua"))()
 
+-- ✅ AutoPlaceEgg (entrega ovo na base)
+Loading.Update(61)
+loadstring(GetScript("Features/AutoPlaceEgg.lua"))()
+
+-- ✅ AutoHatch (choca no ponto de hatch)
+Loading.Update(62)
+loadstring(GetScript("Features/AutoHatch.lua"))()
+
 -- ==================================================
 -- LOAD TABS
 -- ==================================================
-Loading.Update(62)
+Loading.Update(64)
 loadstring(GetScript("Tabs/Info.lua"))()
 
 Loading.Update(65)
