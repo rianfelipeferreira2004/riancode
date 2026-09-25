@@ -3,11 +3,8 @@
 -- Só bootstrap: baixa cada módulo de src/ChilliHub e
 -- entrega as factories para Main.lua montar o Ctx.
 --
--- COMO USAR:
---  1) Suba a pasta src/ para o seu GitHub (mesmo repo).
---  2) Troque BASE abaixo pela URL raw da pasta src/ChilliHub
---     ex: "https://raw.githubusercontent.com/SEUUSER/SEUREPO/main/src/ChilliHub"
---  3) No executor: loadstring(game:HttpGet(BASE.."/../Load.lua"))()
+-- COMO USAR (executor):
+--   loadstring(game:HttpGet("https://raw.githubusercontent.com/rianfelipeferreira2004/v2/main/Load.lua"))()
 --
 -- O código antigo (monolito de 1400 linhas) está no git:
 --   git show HEAD:Load.lua  (ou renomeie este arquivo)
