@@ -153,6 +153,9 @@ local State = {
     JPEnabled = false,
     AntiAFK = true,
     Godmode = false,
+    AntiKick = true,
+    Humanized = false,
+    BlockKickRemotes = false,
 }
 
 -- Listas conhecidas do jogo (podem expandir com updates)
@@ -186,6 +189,60 @@ LocalPlayer.Idled:Connect(function()
         pcall(function() VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end)
     end
 end)
+
+--========================================================
+--// 4b. BYPASS ANTI-CHEAT (client-side)
+--========================================================
+-- Cobre: kick direto (LocalPlayer:Kick), namecall Kick e,
+-- se ativado, remotes com nome de kick/ban/detect. Nao ha
+-- como burlar checagem de posicao feita no servidor, por
+-- isso o tween ja e gradual e existe o Modo Humano
+-- (delays aleatorios) + aviso p/ manter valores moderados.
+local function HDelay(base)
+    if State.Humanized and type(base) == "number" then
+        return base * (0.7 + math.random() * 0.6)
+    end
+    return base
+end
+
+local __ChilliHooked = false
+local function SetupAntiCheat(force)
+    if __ChilliHooked and not force then return true end
+    local applied = {}
+    -- 1) namecall hook: barra Kick + (opcional) remotes suspeitos
+    if hookmetamethod and newcclosure then
+        local ok, err = pcall(function()
+            local old
+            old = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+                local m = (getnamecallmethod and getnamecallmethod()) or ""
+                if State.AntiKick and m == "Kick" then
+                    return nil
+                end
+                if State.BlockKickRemotes and (m == "FireServer" or m == "InvokeServer") then
+                    local n = string.lower(tostring((self and self.Name) or ""))
+                    if string.find(n, "kick") or string.find(n, "ban") or string.find(n, "cheat")
+                        or string.find(n, "detect") or string.find(n, "anticheat") or string.find(n, "anti_cheat") then
+                        warn("[ChilliHub] Remote bloqueado: " .. tostring(self:GetFullName()))
+                        return nil
+                    end
+                end
+                return old(self, ...)
+            end))
+        end)
+        if ok then table.insert(applied, "namecall") else warn("[ChilliHub] bypass namecall falhou: " .. tostring(err)) end
+    end
+    -- 2) hook direto no Kick do jogador (fallback p/ executor sem hookmetamethod)
+    if hookfunction and newcclosure then
+        pcall(function()
+            hookfunction(LocalPlayer.Kick, newcclosure(function(...) return nil end))
+            table.insert(applied, "kick-fn")
+        end)
+    end
+    __ChilliHooked = #applied > 0
+    print("[ChilliHub] Bypass aplicado: " .. (#applied > 0 and table.concat(applied, ",") or "SEM SUPORTE no executor"))
+    Notify("Bypass", #applied > 0 and ("Ativo via: " .. table.concat(applied, ", ")) or "Executor sem hook - risco maior de kick", 6)
+    return __ChilliHooked
+end
 
 local function ServerHop()
     local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(PLACE_ID)
@@ -575,7 +632,7 @@ task.spawn(function()
                 if GetCarryingEgg() and State.AutoReturn then
                     local cf = GetMyBaseCFrame()
                     if cf then TweenTo(cf + Vector3.new(0, 4, 0)) task.wait(0.3) FirePromptsInRadius(cf.Position, 20) end
-                    task.wait(State.StealDelay)
+                    task.wait(HDelay(State.StealDelay))
                 else
                     local eggs = FindEggs()
                     if not State.AutoStealAll then
@@ -592,7 +649,7 @@ task.spawn(function()
                             TweenTo(CFrame.new(target.Position + Vector3.new(0, 4, 0)))
                         else
                             TryStealEgg(target)
-                            task.wait(State.StealDelay)
+                            task.wait(HDelay(State.StealDelay))
                         end
                     else
                         task.wait(0.5)
@@ -661,7 +718,7 @@ task.spawn(function()
                     if eq then SafeFire(eq, "Best") SafeFire(eq, true) end
                 end
             end)
-            task.wait(math.clamp(State.HatchDelay, 0.1, 5))
+            task.wait(HDelay(math.clamp(State.HatchDelay, 0.1, 5)))
         else
             task.wait(0.5)
         end
@@ -713,7 +770,7 @@ task.spawn(function()
                 local cf = GetMyBaseCFrame()
                 if cf then FirePromptsInRadius(cf.Position, 25) end
             end)
-            task.wait(math.clamp(State.CollectDelay, 0.5, 30))
+            task.wait(HDelay(math.clamp(State.CollectDelay, 0.5, 30)))
         end
         task.wait(0.2)
     end
@@ -883,6 +940,7 @@ local function BuildOrionUI()
     local VisualTab = Window:MakeTab({ Name = "Visual", Icon = "rbxassetid://4483362458", PremiumOnly = false })
     local JogadorTab = Window:MakeTab({ Name = "Jogador", Icon = "rbxassetid://4483362458", PremiumOnly = false })
     local DiagTab = Window:MakeTab({ Name = "Diagnostico", Icon = "rbxassetid://4483362458", PremiumOnly = false })
+    local ProtTab = Window:MakeTab({ Name = "Protecao", Icon = "rbxassetid://4483362458", PremiumOnly = false })
 
     local function ParseList(s)
         local out = {}
@@ -1016,6 +1074,17 @@ local function BuildOrionUI()
             Notify("FPS", "Boost aplicado")
         end)
     end })
+
+    --========== PROTECAO (bypass anti-cheat) ==========
+    ProtTab:AddSection({ Name = "Bypass Anti-Cheat" })
+    ProtTab:AddParagraph("Como funciona", "Anti-Kick via hook + Modo Humano com delays aleatorios. Sem bypass 100% contra checagem server-side: mantenha Tween Speed e WalkSpeed moderados.")
+    ProtTab:AddToggle({ Name = "Anti-Kick", Default = true, Save = true, Flag = "AntiKick",
+        Callback = function(v) State.AntiKick = v if v then SetupAntiCheat() end end })
+    ProtTab:AddToggle({ Name = "Modo Humano (delays aleatorios)", Default = false, Save = true, Flag = "Humanized",
+        Callback = function(v) State.Humanized = v end })
+    ProtTab:AddToggle({ Name = "Bloquear remotes Kick/Ban (agressivo)", Default = false, Save = true, Flag = "BlockKickRemotes",
+        Callback = function(v) State.BlockKickRemotes = v end })
+    ProtTab:AddButton({ Name = "Reaplicar Bypass agora", Callback = function() SetupAntiCheat(true) end })
 
     --========== DIAGNOSTICO ==========
     DiagTab:AddSection({ Name = "Autodescoberta" })
@@ -1207,6 +1276,10 @@ local function BuildNativeUI()
     toggle("Godmode", function() return State.Godmode end, function(v) State.Godmode = v end)
     button("Server Hop", ServerHop)
     button("Rejoin", function() TeleportService:Teleport(PLACE_ID, LocalPlayer) end)
+    header("PROTECAO")
+    toggle("Anti-Kick", function() return State.AntiKick end, function(v) State.AntiKick = v if v then SetupAntiCheat() end end)
+    toggle("Modo Humano", function() return State.Humanized end, function(v) State.Humanized = v end)
+    toggle("Block Kick/Ban", function() return State.BlockKickRemotes end, function(v) State.BlockKickRemotes = v end)
     header("DIAGNOSTICO")
     button("Escanear Remotes", function()
         local n = RefreshRemotes()
@@ -1234,3 +1307,7 @@ do
     end
     print("[ChilliHub] UI ativa: " .. tostring(UI_MODE) .. " | " .. table.concat(DiagLog, " || "))
 end
+task.spawn(function()
+    task.wait(2)
+    if State.AntiKick then SetupAntiCheat() end
+end)
