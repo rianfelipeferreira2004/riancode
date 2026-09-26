@@ -23,8 +23,8 @@ function CreateTab(Name, Order)
     local TabScroll = _G.YOKUDO_TabScroll
     local Tab = Instance.new("TextButton")
     Tab.Name = Name:gsub("%s+", "_") .. "_Tab"
-    Tab.Size = UDim2.new(1, 0, 0, 32)
-    Tab.BackgroundColor3 = Color3.fromRGB(38, 40, 52)
+    Tab.Size = UDim2.new(1, 0, 0, 36)
+    Tab.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
     Tab.BackgroundTransparency = 1
     Tab.BorderSizePixel = 0
     Tab.Text = ""
@@ -34,20 +34,14 @@ function CreateTab(Name, Order)
     Tab.Parent = TabScroll
 
     local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.CornerRadius = UDim.new(0, 10)
     Corner.Parent = Tab
-
-    local TabBorder = Instance.new("UIStroke")
-    TabBorder.Color = Color3.fromRGB(200, 200, 220)
-    TabBorder.Thickness = 1
-    TabBorder.Transparency = 0.2
-    TabBorder.Parent = Tab
 
     local Indicator = Instance.new("Frame")
     Indicator.Name = "Indicator"
-    Indicator.Size = UDim2.new(0, 3, 0, 18)
-    Indicator.Position = UDim2.new(0, 2, 0.5, -9)
-    Indicator.BackgroundColor3 = Color3.fromRGB(200, 200, 220)
+    Indicator.Size = UDim2.new(0, 4, 0, 20)
+    Indicator.Position = UDim2.new(0, 3, 0.5, -10)
+    Indicator.BackgroundColor3 = Color3.fromRGB(135, 120, 225)
     Indicator.BackgroundTransparency = 1
     Indicator.BorderSizePixel = 0
     Indicator.ZIndex = 8
@@ -57,17 +51,42 @@ function CreateTab(Name, Order)
     IndicatorCorner.CornerRadius = UDim.new(1, 0)
     IndicatorCorner.Parent = Indicator
 
+    -- Badge-ícone próprio: inicial da aba (zero risco de render)
+    local Badge = Instance.new("Frame")
+    Badge.Name = "TabBadge"
+    Badge.Size = UDim2.new(0, 22, 0, 22)
+    Badge.Position = UDim2.new(0, 11, 0.5, -11)
+    Badge.BackgroundColor3 = Color3.fromRGB(38, 40, 54)
+    Badge.BorderSizePixel = 0
+    Badge.ZIndex = 8
+    Badge.Parent = Tab
+
+    local BadgeCorner = Instance.new("UICorner")
+    BadgeCorner.CornerRadius = UDim.new(0, 7)
+    BadgeCorner.Parent = Badge
+
+    local BadgeText = Instance.new("TextLabel")
+    BadgeText.Name = "TabBadgeText"
+    BadgeText.Size = UDim2.new(1, 0, 1, 0)
+    BadgeText.BackgroundTransparency = 1
+    BadgeText.Text = string.upper(string.sub(Name, 1, 1))
+    BadgeText.TextColor3 = Color3.fromRGB(155, 155, 175)
+    BadgeText.TextSize = 11
+    BadgeText.Font = Enum.Font.MontserratBold
+    BadgeText.ZIndex = 9
+    BadgeText.Parent = Badge
+
     local Text = Instance.new("TextLabel")
     Text.Name = "TabText"
-    Text.Size = UDim2.new(1, -10, 1, 0)
-    Text.Position = UDim2.new(0, 8, 0, 0)
+    Text.Size = UDim2.new(1, -44, 1, 0)
+    Text.Position = UDim2.new(0, 39, 0, 0)
     Text.BackgroundTransparency = 1
     Text.Text = Name
     Text.TextColor3 = Color3.fromRGB(155, 155, 175)
     Text.TextSize = GetTabTextSize(Name)
     Text.TextXAlignment = Enum.TextXAlignment.Left
     Text.TextYAlignment = Enum.TextYAlignment.Center
-    Text.Font = Enum.Font.GothamMedium
+    Text.Font = Enum.Font.MontserratBold
     Text.TextTruncate = Enum.TextTruncate.AtEnd
     Text.Active = false
     Text.Selectable = false
@@ -91,9 +110,9 @@ function CreatePage(Name)
     Page.CanvasSize = UDim2.new(0, 0, 0, 0)
     Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Page.ScrollingDirection = Enum.ScrollingDirection.Y
-    Page.ScrollBarThickness = 4
-    Page.ScrollBarImageColor3 = Color3.fromRGB(200, 200, 220)
-    Page.ScrollBarImageTransparency = 0.1
+    Page.ScrollBarThickness = 3
+    Page.ScrollBarImageColor3 = Color3.fromRGB(135, 120, 225)
+    Page.ScrollBarImageTransparency = 0.4
     Page.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     Page.HorizontalScrollBarInset = Enum.ScrollBarInset.None
     Page.Active = true
@@ -122,14 +141,14 @@ end
 function CreateSectionTitle(Parent, TextValue, Order)
     local Label = Instance.new("TextLabel")
     Label.Name = "SectionTitle"
-    Label.Size = UDim2.new(1, 0, 0, 23)
+    Label.Size = UDim2.new(1, 0, 0, 22)
     Label.BackgroundTransparency = 1
-    Label.Text = TextValue
+    Label.Text = string.upper(TextValue)
     Label.TextColor3 = Color3.fromRGB(235, 235, 245)
-    Label.TextSize = 13
+    Label.TextSize = 12
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.TextYAlignment = Enum.TextYAlignment.Center
-    Label.Font = Enum.Font.GothamBold
+    Label.Font = Enum.Font.MontserratBold
     Label.LayoutOrder = Order or 1
     Label.Active = false
     Label.Selectable = false
@@ -181,7 +200,7 @@ function CreateCheckbox(Parent, TextValue, Order)
     CheckButton.Parent = Holder
 
     local BoxCorner = Instance.new("UICorner")
-    BoxCorner.CornerRadius = UDim.new(0, 6)
+    BoxCorner.CornerRadius = UDim.new(0, 8)
     BoxCorner.Parent = CheckButton
 
     local BoxStroke = Instance.new("UIStroke")
@@ -195,8 +214,8 @@ function CreateCheckbox(Parent, TextValue, Order)
     Check.BackgroundTransparency = 1
     Check.Text = "✓"
     Check.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Check.TextSize = 18
-    Check.Font = Enum.Font.GothamBold
+    Check.TextSize = 16
+    Check.Font = Enum.Font.MontserratBold
     Check.Visible = false
     Check.Active = false
     Check.Selectable = false
@@ -296,7 +315,7 @@ function CreateTextBoxWithCheckbox(Parent, TextValue, Order, DefaultValue, MinVa
     CheckButton.Parent = Holder
 
     local BoxCorner = Instance.new("UICorner")
-    BoxCorner.CornerRadius = UDim.new(0, 6)
+    BoxCorner.CornerRadius = UDim.new(0, 8)
     BoxCorner.Parent = CheckButton
 
     local BoxStroke = Instance.new("UIStroke")
@@ -310,8 +329,8 @@ function CreateTextBoxWithCheckbox(Parent, TextValue, Order, DefaultValue, MinVa
     Check.BackgroundTransparency = 1
     Check.Text = "✓"
     Check.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Check.TextSize = 18
-    Check.Font = Enum.Font.GothamBold
+    Check.TextSize = 16
+    Check.Font = Enum.Font.MontserratBold
     Check.Visible = false
     Check.Active = false
     Check.Selectable = false
@@ -384,7 +403,7 @@ function CreateSmartCheckbox(Parent, LabelText, Order, ToggleFunction, GetStateF
     Button.Parent = Holder
 
     local BoxCorner = Instance.new("UICorner")
-    BoxCorner.CornerRadius = UDim.new(0, 6)
+    BoxCorner.CornerRadius = UDim.new(0, 8)
     BoxCorner.Parent = Button
 
     local BoxStroke = Instance.new("UIStroke")
@@ -397,8 +416,8 @@ function CreateSmartCheckbox(Parent, LabelText, Order, ToggleFunction, GetStateF
     Check.BackgroundTransparency = 1
     Check.Text = "✓"
     Check.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Check.TextSize = 18
-    Check.Font = Enum.Font.GothamBold
+    Check.TextSize = 16
+    Check.Font = Enum.Font.MontserratBold
     Check.Visible = false
     Check.Parent = Button
 

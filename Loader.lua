@@ -1,5 +1,5 @@
 -- ==================================================
--- YOKUDO HUB | STEAL AN EGG | Loader
+-- Asthetic | STEAL AN EGG | Loader
 -- ✅ Load CharacterSystem មុន Features
 -- ✅ VIPTP ជំនួស EggCheckPremium
 -- ==================================================
@@ -20,7 +20,7 @@ print = function(...)
     end
 end
 
-print("🔵 Loading YOKUDO HUB...")
+print("🔵 Loading Asthetic...")
 
 -- ==================================================
 -- CACHE SYSTEM
@@ -64,19 +64,19 @@ local function CreateLoadingScreen()
     Container.Size = UDim2.new(0, 280, 0, 110)
     Container.Position = UDim2.new(0.5, -140, 0.5, -55)
     Container.BackgroundColor3 = Color3.fromRGB(16, 17, 23)
-    Container.BackgroundTransparency = 0.1
+    Container.BackgroundTransparency = 0.08
     Container.BorderSizePixel = 0
     Container.ClipsDescendants = true
     Container.Parent = LoadingGui
 
     local ContainerCorner = Instance.new("UICorner")
-    ContainerCorner.CornerRadius = UDim.new(0, 14)
+    ContainerCorner.CornerRadius = UDim.new(0, 16)
     ContainerCorner.Parent = Container
 
     local ContainerBorder = Instance.new("UIStroke")
-    ContainerBorder.Color = Color3.fromRGB(105, 90, 190)
-    ContainerBorder.Thickness = 2
-    ContainerBorder.Transparency = 0.2
+    ContainerBorder.Color = Color3.fromRGB(135, 120, 225)
+    ContainerBorder.Thickness = 1.5
+    ContainerBorder.Transparency = 0.3
     ContainerBorder.Parent = Container
 
     local Title = Instance.new("TextLabel")
@@ -84,12 +84,12 @@ local function CreateLoadingScreen()
     Title.Size = UDim2.new(1, -30, 0, 28)
     Title.Position = UDim2.new(0, 15, 0, 8)
     Title.BackgroundTransparency = 1
-    Title.Text = "YOKUDO HUB"
+    Title.Text = "ASTHETIC"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 20
+    Title.TextSize = 22
     Title.TextXAlignment = Enum.TextXAlignment.Center
     Title.TextYAlignment = Enum.TextYAlignment.Center
-    Title.Font = Enum.Font.GothamBold
+    Title.Font = Enum.Font.MontserratBlack
     Title.Parent = Container
 
     local Subtitle = Instance.new("TextLabel")
@@ -280,14 +280,22 @@ Loading.Update(98)
 loadstring(GetScript("Features/BypassAntiCheat.lua"))()
 
 -- ==================================================
--- ✅ WAIT 2 SECONDS THEN APPLY CONFIG
+-- ✅ WAIT 2 SECONDS THEN AUTOLOAD + AUTOEXECUTE CONFIG
+-- Save em cada toggle → rejoin religa tudo sozinho
 -- ==================================================
 print("⏳ Waiting 2s before applying config...")
 task.wait(2)
 
 if _G.YOKUDO_ConfigSystem then
-    print("🔧 Applying Config...")
-    _G.YOKUDO_ConfigSystem.Load()
+    print("🔧 Autoload + AutoExecute Config...")
+    local Cfg = nil
+    pcall(function()
+        Cfg = _G.YOKUDO_ConfigSystem.Load()
+    end)
+    task.wait(1)
+    pcall(function()
+        _G.YOKUDO_ConfigSystem.AutoExecute(Cfg)
+    end)
 end
 
 Loading.Update(100)
@@ -295,4 +303,4 @@ Loading.Update(100)
 task.wait(0.3)
 Loading.Destroy()
 print("✅ Loading Screen Closed!")
-print("🚀 YOKUDO HUB | Ready!")
+print("🚀 Asthetic | Ready!")

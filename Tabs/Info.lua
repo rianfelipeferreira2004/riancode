@@ -1,166 +1,173 @@
 --==================================================
--- YOKUDO HUB | TAB | Info
+-- Asthetic | TAB | Info
 --==================================================
 
 local TabsManager = _G.YOKUDO_TabsManager
-local TweenService = game:GetService("TweenService")
 
 local InfoTab, InfoPage = TabsManager:RegisterTab("Info", 1, "INFO")
 
 --==================================================
 -- INFO CONTENT
 --==================================================
-CreateSectionTitle(InfoPage, "YOKUDO HUB | Steal An Egg", 1)
+CreateSectionTitle(InfoPage, "Welcome", 1)
 
 --==================================================
--- TITLE: Join Group For Notification Update Script
+-- HERO CARD
 --==================================================
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, 0, 0, 26)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "Join Group For Notification Update Script"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 13
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.LayoutOrder = 2
-TitleLabel.Parent = InfoPage
+local HeroCard = Instance.new("Frame")
+HeroCard.Size = UDim2.new(1, 0, 0, 88)
+HeroCard.BackgroundColor3 = Color3.fromRGB(26, 27, 38)
+HeroCard.BorderSizePixel = 0
+HeroCard.LayoutOrder = 2
+HeroCard.Parent = InfoPage
+
+local HeroCorner = Instance.new("UICorner")
+HeroCorner.CornerRadius = UDim.new(0, 12)
+HeroCorner.Parent = HeroCard
+
+local HeroStroke = Instance.new("UIStroke")
+HeroStroke.Color = Color3.fromRGB(135, 120, 225)
+HeroStroke.Thickness = 1
+HeroStroke.Transparency = 0.5
+HeroStroke.Parent = HeroCard
+
+local HeroBadge = Instance.new("Frame")
+HeroBadge.Size = UDim2.new(0, 46, 0, 46)
+HeroBadge.Position = UDim2.new(0, 14, 0.5, -23)
+HeroBadge.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
+HeroBadge.BorderSizePixel = 0
+HeroBadge.Parent = HeroCard
+
+local HeroBadgeCorner = Instance.new("UICorner")
+HeroBadgeCorner.CornerRadius = UDim.new(0, 13)
+HeroBadgeCorner.Parent = HeroBadge
+
+local HeroBadgeText = Instance.new("TextLabel")
+HeroBadgeText.Size = UDim2.new(1, 0, 1, 0)
+HeroBadgeText.BackgroundTransparency = 1
+HeroBadgeText.Text = "A"
+HeroBadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+HeroBadgeText.TextSize = 24
+HeroBadgeText.Font = Enum.Font.MontserratBlack
+HeroBadgeText.Parent = HeroBadge
+
+local HeroTitle = Instance.new("TextLabel")
+HeroTitle.Size = UDim2.new(1, -80, 0, 26)
+HeroTitle.Position = UDim2.new(0, 70, 0, 16)
+HeroTitle.BackgroundTransparency = 1
+HeroTitle.Text = "ASTHETIC"
+HeroTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+HeroTitle.TextSize = 20
+HeroTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeroTitle.Font = Enum.Font.MontserratBlack
+HeroTitle.LayoutOrder = 2
+HeroTitle.Parent = HeroCard
+
+local HeroSub = Instance.new("TextLabel")
+HeroSub.Size = UDim2.new(1, -80, 0, 18)
+HeroSub.Position = UDim2.new(0, 70, 0, 44)
+HeroSub.BackgroundTransparency = 1
+HeroSub.Text = "Steal An Egg"
+HeroSub.TextColor3 = Color3.fromRGB(150, 150, 175)
+HeroSub.TextSize = 11
+HeroSub.TextXAlignment = Enum.TextXAlignment.Left
+HeroSub.Font = Enum.Font.GothamMedium
+HeroSub.Parent = HeroCard
 
 --==================================================
--- GROUP DISCORD
+-- STATUS CARD
 --==================================================
-local GroupLabel = Instance.new("TextLabel")
-GroupLabel.Size = UDim2.new(1, 0, 0, 24)
-GroupLabel.BackgroundTransparency = 1
-GroupLabel.Text = "Group Discord"
-GroupLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-GroupLabel.TextSize = 13
-GroupLabel.TextXAlignment = Enum.TextXAlignment.Left
-GroupLabel.Font = Enum.Font.GothamMedium
-GroupLabel.LayoutOrder = 3
-GroupLabel.Parent = InfoPage
+local StatusCard = Instance.new("Frame")
+StatusCard.Size = UDim2.new(1, 0, 0, 92)
+StatusCard.BackgroundColor3 = Color3.fromRGB(26, 27, 38)
+StatusCard.BorderSizePixel = 0
+StatusCard.LayoutOrder = 3
+StatusCard.Parent = InfoPage
 
---==================================================
--- LINK (Clickable Copy)
---==================================================
-local LinkBtn = Instance.new("TextButton")
-LinkBtn.Size = UDim2.new(1, 0, 0, 30)
-LinkBtn.BackgroundColor3 = Color3.fromRGB(28, 29, 42)
-LinkBtn.BorderSizePixel = 0
-LinkBtn.Text = "Link : https://discord.gg/aKeK6avatS"
-LinkBtn.TextColor3 = Color3.fromRGB(120, 180, 255)
-LinkBtn.TextSize = 12
-LinkBtn.TextXAlignment = Enum.TextXAlignment.Left
-LinkBtn.Font = Enum.Font.GothamMedium
-LinkBtn.AutoButtonColor = false
-LinkBtn.LayoutOrder = 4
-LinkBtn.Parent = InfoPage
+local StatusCorner = Instance.new("UICorner")
+StatusCorner.CornerRadius = UDim.new(0, 12)
+StatusCorner.Parent = StatusCard
 
-local LinkCorner = Instance.new("UICorner")
-LinkCorner.CornerRadius = UDim.new(0, 6)
-LinkCorner.Parent = LinkBtn
+local StatusStroke = Instance.new("UIStroke")
+StatusStroke.Color = Color3.fromRGB(200, 200, 220)
+StatusStroke.Thickness = 1
+StatusStroke.Transparency = 0.85
+StatusStroke.Parent = StatusCard
 
-local LinkStroke = Instance.new("UIStroke")
-LinkStroke.Color = Color3.fromRGB(105, 90, 190)
-LinkStroke.Thickness = 1
-LinkStroke.Transparency = 0.4
-LinkStroke.Parent = LinkBtn
+local StatusPadding = Instance.new("UIPadding")
+StatusPadding.PaddingTop = UDim.new(0, 8)
+StatusPadding.PaddingBottom = UDim.new(0, 8)
+StatusPadding.PaddingLeft = UDim.new(0, 14)
+StatusPadding.PaddingRight = UDim.new(0, 14)
+StatusPadding.Parent = StatusCard
 
-local LinkPadding = Instance.new("UIPadding")
-LinkPadding.PaddingLeft = UDim.new(0, 10)
-LinkPadding.PaddingRight = UDim.new(0, 10)
-LinkPadding.Parent = LinkBtn
+local StatusLayout = Instance.new("UIListLayout")
+StatusLayout.Padding = UDim.new(0, 2)
+StatusLayout.SortOrder = Enum.SortOrder.LayoutOrder
+StatusLayout.Parent = StatusCard
 
---==================================================
--- COPY BUTTON
---==================================================
-local CopyBtn = Instance.new("TextButton")
-CopyBtn.Size = UDim2.new(0, 120, 0, 32)
-CopyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-CopyBtn.BorderSizePixel = 0
-CopyBtn.Text = "COPY LINK"
-CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CopyBtn.TextSize = 12
-CopyBtn.Font = Enum.Font.GothamBold
-CopyBtn.AutoButtonColor = false
-CopyBtn.LayoutOrder = 5
-CopyBtn.Parent = InfoPage
+local function CreateStatusRow(LabelText, ValueText, ValueColor, Order)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, 0, 0, 22)
+    Row.BackgroundTransparency = 1
+    Row.LayoutOrder = Order
+    Row.Parent = StatusCard
 
-local CopyCorner = Instance.new("UICorner")
-CopyCorner.CornerRadius = UDim.new(0, 6)
-CopyCorner.Parent = CopyBtn
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.55, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = LabelText
+    Label.TextColor3 = Color3.fromRGB(150, 150, 175)
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Font = Enum.Font.GothamMedium
+    Label.Parent = Row
 
-local CopyStroke = Instance.new("UIStroke")
-CopyStroke.Color = Color3.fromRGB(120, 130, 255)
-CopyStroke.Thickness = 1.5
-CopyStroke.Transparency = 0.3
-CopyStroke.Parent = CopyBtn
-
--- ==================================================
--- COPY FUNCTION
--- ==================================================
-local DISCORD_LINK = "https://discord.gg/aKeK6avatS"
-
-local function CopyDiscord()
-    local Success = pcall(function()
-        setclipboard(DISCORD_LINK)
-    end)
-
-    if Success then
-        CopyBtn.Text = "COPIED!"
-        CopyBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
-
-        task.delay(1.5, function()
-            CopyBtn.Text = "COPY LINK"
-            CopyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-        end)
-
-        print("[YOKUDO] Discord Link Copied: " .. DISCORD_LINK)
-    else
-        CopyBtn.Text = "FAILED!"
-        CopyBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-
-        task.delay(1.5, function()
-            CopyBtn.Text = "COPY LINK"
-            CopyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-        end)
-
-        warn("[YOKUDO] Failed to copy Discord link")
-    end
+    local Value = Instance.new("TextLabel")
+    Value.Size = UDim2.new(0.45, 0, 1, 0)
+    Value.Position = UDim2.new(0.55, 0, 0, 0)
+    Value.BackgroundTransparency = 1
+    Value.Text = ValueText
+    Value.TextColor3 = ValueColor
+    Value.TextSize = 12
+    Value.TextXAlignment = Enum.TextXAlignment.Right
+    Value.Font = Enum.Font.MontserratBold
+    Value.Parent = Row
 end
 
--- ==================================================
--- BUTTON EVENTS
--- ==================================================
-CopyBtn.MouseButton1Click:Connect(CopyDiscord)
-LinkBtn.MouseButton1Click:Connect(CopyDiscord)
+CreateStatusRow("Status", "● Ready", Color3.fromRGB(90, 230, 140), 1)
+CreateStatusRow("Config", "Auto-save ON", Color3.fromRGB(135, 120, 225), 2)
+CreateStatusRow("Design", "Fluent Own", Color3.fromRGB(200, 200, 220), 3)
 
-CopyBtn.MouseEnter:Connect(function()
-    if CopyBtn.Text == "COPY LINK" then
-        TweenService:Create(CopyBtn, TweenInfo.new(0.15), {
-            BackgroundColor3 = Color3.fromRGB(108, 121, 255)
-        }):Play()
-    end
-end)
+--==================================================
+-- HINT CARD
+--==================================================
+local HintCard = Instance.new("Frame")
+HintCard.Size = UDim2.new(1, 0, 0, 40)
+HintCard.BackgroundColor3 = Color3.fromRGB(26, 27, 38)
+HintCard.BorderSizePixel = 0
+HintCard.LayoutOrder = 4
+HintCard.Parent = InfoPage
 
-CopyBtn.MouseLeave:Connect(function()
-    if CopyBtn.Text == "COPY LINK" then
-        TweenService:Create(CopyBtn, TweenInfo.new(0.15), {
-            BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-        }):Play()
-    end
-end)
+local HintCorner = Instance.new("UICorner")
+HintCorner.CornerRadius = UDim.new(0, 12)
+HintCorner.Parent = HintCard
 
-LinkBtn.MouseEnter:Connect(function()
-    TweenService:Create(LinkBtn, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(38, 39, 55)
-    }):Play()
-end)
+local HintStroke = Instance.new("UIStroke")
+HintStroke.Color = Color3.fromRGB(200, 200, 220)
+HintStroke.Thickness = 1
+HintStroke.Transparency = 0.85
+HintStroke.Parent = HintCard
 
-LinkBtn.MouseLeave:Connect(function()
-    TweenService:Create(LinkBtn, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(28, 29, 42)
-    }):Play()
-end)
+local HintText = Instance.new("TextLabel")
+HintText.Size = UDim2.new(1, -24, 1, 0)
+HintText.Position = UDim2.new(0, 12, 0, 0)
+HintText.BackgroundTransparency = 1
+HintText.Text = "Press the A button to hide / show the UI."
+HintText.TextColor3 = Color3.fromRGB(150, 150, 175)
+HintText.TextSize = 11
+HintText.TextXAlignment = Enum.TextXAlignment.Left
+HintText.Font = Enum.Font.GothamMedium
+HintText.Parent = HintCard
 
 print("✅ Info Tab Loaded")

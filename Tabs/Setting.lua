@@ -12,6 +12,14 @@ local SettingTab, SettingPage = TabsManager:RegisterTab("Setting", 8, "SETTING")
 --==================================================
 CreateSectionTitle(SettingPage, "Settings", 1)
 
+local function SaveSettingConfig()
+    pcall(function()
+        if _G.YOKUDO_ConfigSystem then
+            _G.YOKUDO_ConfigSystem.Save()
+        end
+    end)
+end
+
 --==================================================
 -- FEATURE 1: SELECT METHOD TELEPORT (DROPDOWN)
 --==================================================
@@ -338,23 +346,32 @@ WalkSpeedCheck.Parent = WalkSpeedCheckButton
 local WalkSpeedEnabled = false
 local WalkSpeedValue = 50
 
-local function ToggleWalkSpeed()
-    WalkSpeedEnabled = not WalkSpeedEnabled
-    WalkSpeedCheck.Visible = WalkSpeedEnabled
-    if WalkSpeedEnabled then
+local function UpdateWalkSpeedUI(State)
+    WalkSpeedEnabled = State
+    WalkSpeedCheck.Visible = State
+    if State then
         WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         WalkSpeedStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+local function ToggleWalkSpeed()
+    local NewState = not WalkSpeedEnabled
+    UpdateWalkSpeedUI(NewState)
+    if NewState then
         if _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
             _G.YOKUDO_WalkSpeed.Enable()
         end
     else
-        WalkSpeedCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        WalkSpeedStroke.Color = Color3.fromRGB(200, 200, 220)
         if _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.Disable()
         end
     end
+    SaveSettingConfig()
 end
 
 WalkSpeedCheckButton.MouseButton1Click:Connect(function()
@@ -366,9 +383,11 @@ WalkSpeedTextBox.FocusLost:Connect(function()
     if val then
         WalkSpeedValue = math.clamp(val, 50, 1000)
         WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
+        _G.YOKUDO_WalkSpeedValue = WalkSpeedValue
         if WalkSpeedEnabled and _G.YOKUDO_WalkSpeed then
             _G.YOKUDO_WalkSpeed.SetValue(WalkSpeedValue)
         end
+        SaveSettingConfig()
     else
         WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
     end
@@ -436,22 +455,31 @@ AntiTrapCheck.Parent = AntiTrapCheckButton
 
 local AntiTrapEnabled = false
 
-local function ToggleAntiTrap()
-    AntiTrapEnabled = not AntiTrapEnabled
-    AntiTrapCheck.Visible = AntiTrapEnabled
-    if AntiTrapEnabled then
+local function UpdateAntiTrapUI(State)
+    AntiTrapEnabled = State
+    AntiTrapCheck.Visible = State
+    if State then
         AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AntiTrapStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+local function ToggleAntiTrap()
+    local NewState = not AntiTrapEnabled
+    UpdateAntiTrapUI(NewState)
+    if NewState then
         if _G.YOKUDO_AntiTrap then
             _G.YOKUDO_AntiTrap.Enable()
         end
     else
-        AntiTrapCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        AntiTrapStroke.Color = Color3.fromRGB(200, 200, 220)
         if _G.YOKUDO_AntiTrap then
             _G.YOKUDO_AntiTrap.Disable()
         end
     end
+    SaveSettingConfig()
 end
 
 AntiTrapCheckButton.MouseButton1Click:Connect(function()
@@ -702,6 +730,7 @@ FastClickButton.MouseButton1Click:Connect(function()
         _G.YOKUDO_ManualFastClick.Enable()
         ShowNotification("Manual Fast Click Start")
     end
+    SaveSettingConfig()
 end)
 
 task.spawn(function()
@@ -777,22 +806,31 @@ AntiAFKCheck.Parent = AntiAFKCheckButton
 
 local AntiAFKEnabled = false
 
-local function ToggleAntiAFK()
-    AntiAFKEnabled = not AntiAFKEnabled
-    AntiAFKCheck.Visible = AntiAFKEnabled
-    if AntiAFKEnabled then
+local function UpdateAntiAFKUI(State)
+    AntiAFKEnabled = State
+    AntiAFKCheck.Visible = State
+    if State then
         AntiAFKCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AntiAFKStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        AntiAFKCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        AntiAFKStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+local function ToggleAntiAFK()
+    local NewState = not AntiAFKEnabled
+    UpdateAntiAFKUI(NewState)
+    if NewState then
         if _G.YOKUDO_AntiAFK then
             _G.YOKUDO_AntiAFK.Enable()
         end
     else
-        AntiAFKCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        AntiAFKStroke.Color = Color3.fromRGB(200, 200, 220)
         if _G.YOKUDO_AntiAFK then
             _G.YOKUDO_AntiAFK.Disable()
         end
     end
+    SaveSettingConfig()
 end
 
 AntiAFKCheckButton.MouseButton1Click:Connect(function()
@@ -800,31 +838,63 @@ AntiAFKCheckButton.MouseButton1Click:Connect(function()
 end)
 
 --==================================================
--- ✅ SYNC ON LOAD (Only Once - After Setting Load)
+-- ✅ REFRESH (autoload / rejoin → ConfigSystem chama)
 --==================================================
-task.spawn(function()
-    task.wait(0.5)
-
-    -- ✅ Sync Dropdown
+_G.YOKUDO_RefreshSettingUI = function()
+    -- Dropdown método
     if _G.YOKUDO_SelectedMethod then
         SelectedMethod = _G.YOKUDO_SelectedMethod
         DropdownBtn.Text = SelectedMethod .. " ▼"
     end
-
-    -- ✅ Sync Speed
+    -- Speed
     if _G.YOKUDO_TeleportSpeed then
-        SpeedTextBox.Text = tostring(_G.YOKUDO_TeleportSpeed)
-    end
-
-    -- ✅ Sync Anti AFK
-    if _G.YOKUDO_AntiAFK then
-        if _G.YOKUDO_AntiAFK.IsEnabled() then
-            AntiAFKEnabled = true
-            AntiAFKCheck.Visible = true
-            AntiAFKCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
-            AntiAFKStroke.Color = Color3.fromRGB(135, 120, 225)
+        if not IsEditingSpeed then
+            SpeedTextBox.Text = tostring(_G.YOKUDO_TeleportSpeed)
         end
     end
+    -- WalkSpeed
+    pcall(function()
+        if _G.YOKUDO_WalkSpeed then
+            UpdateWalkSpeedUI(_G.YOKUDO_WalkSpeed.IsEnabled())
+            WalkSpeedValue = _G.YOKUDO_WalkSpeed.GetValue()
+            WalkSpeedTextBox.Text = tostring(WalkSpeedValue)
+        end
+    end)
+    -- AntiTrap
+    pcall(function()
+        if _G.YOKUDO_AntiTrap then
+            UpdateAntiTrapUI(_G.YOKUDO_AntiTrap.IsEnabled())
+        end
+    end)
+    -- AntiAFK
+    pcall(function()
+        if _G.YOKUDO_AntiAFK then
+            UpdateAntiAFKUI(_G.YOKUDO_AntiAFK.IsEnabled())
+        end
+    end)
+    -- FastClick botão
+    pcall(function()
+        if _G.YOKUDO_ManualFastClick then
+            if _G.YOKUDO_ManualFastClick.IsEnabled() then
+                FastClickButton.Text = "Stop"
+            else
+                FastClickButton.Text = "Click"
+            end
+        end
+    end)
+    print("[YOKUDO] Setting Tab UI Refreshed")
+end
+
+--==================================================
+-- ✅ SYNC ON LOAD (Only Once - After Setting Load)
+--==================================================
+task.spawn(function()
+    task.wait(0.5)
+    pcall(function()
+        if _G.YOKUDO_RefreshSettingUI then
+            _G.YOKUDO_RefreshSettingUI()
+        end
+    end)
 end)
 
 print("✅ Setting Tab Loaded")

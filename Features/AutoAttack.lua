@@ -30,6 +30,11 @@ end
 local ATTACK_RANGE = 60
 local FIRE_INTERVAL = 0.01
 
+-- ✅ Pausa o combate enquanto estiver na esteira (treadmill)
+local TREADMILL_PAUSE_DIST = 12
+local CachedTreadmillPos = nil
+local LastTreadmillScan = 0
+
 -- ==================================================
 -- STATE
 -- ==================================================
@@ -50,6 +55,56 @@ local function GetHumanoid()
     local Hum = Char:FindFirstChildOfClass("Humanoid")
     local Root = Char:FindFirstChild("HumanoidRootPart")
     return Hum, Root
+end
+
+-- ==================================================
+-- ✅ TREADMILL CHECK (esteira)
+-- Pausa o bat enquanto o player estiver na esteira do AFK.
+-- 1) Se o AFKSystem estiver ligado = voando pra esteira ou em cima dela → pausa.
+-- 2) Se estiver fisicamente perto da própria esteira (<= 12 studs) → pausa.
+-- ==================================================
+local function GetTreadmillPosCached()
+    if _G.YOKUDO_AFKSystem then
+        local Ok, Pos = pcall(function()
+            return _G.YOKUDO_AFKSystem.GetMyTreadmillPos()
+        end)
+        if Ok and typeof(Pos) == "Vector3" then
+            CachedTreadmillPos = Pos
+            return Pos
+        end
+        -- Throttle: varredura de Plots no máximo 1x a cada 2s (evita lag no Heartbeat)
+        if tick() - LastTreadmillScan > 2 then
+            LastTreadmillScan = tick()
+            local Ok2, _, Treadmill = pcall(function()
+                return _G.YOKUDO_AFKSystem.FindMyPlotAndTreadmill()
+            end)
+            if Ok2 and Treadmill and Treadmill.Position then
+                CachedTreadmillPos = Treadmill.Position
+                return CachedTreadmillPos
+            end
+        end
+    end
+    return CachedTreadmillPos
+end
+
+local function IsOnTreadmill()
+    local _, Root = GetHumanoid()
+    if not Root then return false end
+    -- AFK ligado = indo pra esteira / em cima dela → não combate
+    if _G.YOKUDO_AFKSystem then
+        local Ok, AFKOn = pcall(function()
+            return _G.YOKUDO_AFKSystem.IsEnabled()
+        end)
+        if Ok and AFKOn == true then
+            return true
+        end
+    end
+    -- Mesmo com AFK desligado: parado em cima da esteira → não combate
+    local TPos = GetTreadmillPosCached()
+    if TPos and (Root.Position - TPos).Magnitude <= TREADMILL_PAUSE_DIST then
+        return true
+    end
+    return false
 end
 
 -- ==================================================
@@ -80,6 +135,7 @@ end
 -- FEATURE 1: AUTO EQUIP BAT
 -- ==================================================
 local function EquipBat()
+    if IsOnTreadmill() then return false end
     local Bat = FindBatTool()
     if not Bat then return false end
     if Bat.Parent == Backpack then
@@ -105,6 +161,7 @@ local function EnableAutoEquip()
     end
     EquipConnection = RunService.Heartbeat:Connect(function()
         if not AutoEquipEnabled then return end
+        if IsOnTreadmill() then return end
         local Bat = FindBatTool()
         if Bat and Bat.Parent == Backpack then
             EquipBat()
@@ -158,6 +215,7 @@ local function FindClosestPlayer()
 end
 
 local function FireRemote()
+    if IsOnTreadmill() then return end
     local Target = FindClosestPlayer()
     if not Target then return end
     
@@ -181,6 +239,7 @@ local function EnableAutoHit()
     end
     HitConnection = RunService.Heartbeat:Connect(function()
         if not AutoHitEnabled then return end
+        if IsOnTreadmill() then return end
         local now = tick()
         if now - LastFire < FIRE_INTERVAL then return end
         LastFire = now
@@ -217,7 +276,11 @@ _G.YOKUDO_AutoAttack = {
     IsAutoHitEnabled = function() return AutoHitEnabled end,
     FindBatTool = FindBatTool,
     GetBatSwingRemote = GetBatSwingRemote,
-    FindClosestPlayer = FindClosestPlayer
+    FindClosestPlayer = FindClosestPlayer,
+    IsOnTreadmill = IsOnTreadmill,
+    IsPausedByTreadmill = IsOnTreadmill,
+    GetTreadmillPos = GetTreadmillPosCached,
+    TREADMILL_PAUSE_DIST = TREADMILL_PAUSE_DIST,
 }
 
 

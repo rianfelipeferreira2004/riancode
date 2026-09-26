@@ -59,21 +59,38 @@ AutoEquipCheck.Font = Enum.Font.GothamBold
 AutoEquipCheck.Visible = false
 AutoEquipCheck.Parent = AutoEquipCheckButton
 
-local function ToggleAutoEquip()
-    AutoEquipCheck.Visible = not AutoEquipCheck.Visible
-    if AutoEquipCheck.Visible then
+local function SaveCombatConfig()
+    pcall(function()
+        if _G.YOKUDO_ConfigSystem then
+            _G.YOKUDO_ConfigSystem.Save()
+        end
+    end)
+end
+
+local function UpdateAutoEquipUI(State)
+    AutoEquipCheck.Visible = State
+    if State then
         AutoEquipCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AutoEquipStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        AutoEquipCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        AutoEquipStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+local function ToggleAutoEquip()
+    local NewState = not AutoEquipCheck.Visible
+    UpdateAutoEquipUI(NewState)
+    if NewState then
         if _G.YOKUDO_AutoAttack then
             _G.YOKUDO_AutoAttack.EnableAutoEquip()
         end
     else
-        AutoEquipCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        AutoEquipStroke.Color = Color3.fromRGB(200, 200, 220)
         if _G.YOKUDO_AutoAttack then
             _G.YOKUDO_AutoAttack.DisableAutoEquip()
         end
     end
+    SaveCombatConfig()
 end
 
 AutoEquipCheckButton.MouseButton1Click:Connect(function()
@@ -140,25 +157,83 @@ AutoHitCheck.Font = Enum.Font.GothamBold
 AutoHitCheck.Visible = false
 AutoHitCheck.Parent = AutoHitCheckButton
 
-local function ToggleAutoHit()
-    AutoHitCheck.Visible = not AutoHitCheck.Visible
-    if AutoHitCheck.Visible then
+local function UpdateAutoHitUI(State)
+    AutoHitCheck.Visible = State
+    if State then
         AutoHitCheckButton.BackgroundColor3 = Color3.fromRGB(105, 90, 190)
         AutoHitStroke.Color = Color3.fromRGB(135, 120, 225)
+    else
+        AutoHitCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
+        AutoHitStroke.Color = Color3.fromRGB(200, 200, 220)
+    end
+end
+
+local function ToggleAutoHit()
+    local NewState = not AutoHitCheck.Visible
+    UpdateAutoHitUI(NewState)
+    if NewState then
         if _G.YOKUDO_AutoAttack then
             _G.YOKUDO_AutoAttack.EnableAutoHit()
         end
     else
-        AutoHitCheckButton.BackgroundColor3 = Color3.fromRGB(28, 29, 39)
-        AutoHitStroke.Color = Color3.fromRGB(200, 200, 220)
         if _G.YOKUDO_AutoAttack then
             _G.YOKUDO_AutoAttack.DisableAutoHit()
         end
     end
+    SaveCombatConfig()
 end
 
 AutoHitCheckButton.MouseButton1Click:Connect(function()
     ToggleAutoHit()
+end)
+
+-- ==================================================
+-- REFRESH + SYNC (autoload / rejoin)
+-- ==================================================
+_G.YOKUDO_RefreshCombatUI = function()
+    if _G.YOKUDO_AutoAttack then
+        pcall(function() UpdateAutoEquipUI(_G.YOKUDO_AutoAttack.IsAutoEquipEnabled()) end)
+        pcall(function() UpdateAutoHitUI(_G.YOKUDO_AutoAttack.IsAutoHitEnabled()) end)
+    end
+end
+
+-- Sync inicial (pega o estado aplicado pelo AutoExecute)
+task.spawn(function()
+    task.wait(1)
+    pcall(function()
+        if _G.YOKUDO_RefreshCombatUI then
+            _G.YOKUDO_RefreshCombatUI()
+        end
+    end)
+end)
+
+-- Sync periódico + status "pausado na esteira"
+task.spawn(function()
+    local BaseText = "Range: 50 studs"
+    while task.wait(1) do
+        if _G.YOKUDO_AutoAttack then
+            local OkE, E = pcall(function() return _G.YOKUDO_AutoAttack.IsAutoEquipEnabled() end)
+            local OkH, H = pcall(function() return _G.YOKUDO_AutoAttack.IsAutoHitEnabled() end)
+            if OkE and type(E) == "boolean" and E ~= AutoEquipCheck.Visible then
+                UpdateAutoEquipUI(E)
+            end
+            if OkH and type(H) == "boolean" and H ~= AutoHitCheck.Visible then
+                UpdateAutoHitUI(H)
+            end
+            -- Aviso visual: bat pausado na esteira
+            local Paused = false
+            pcall(function()
+                Paused = _G.YOKUDO_AutoAttack.IsOnTreadmill()
+            end)
+            if H and Paused then
+                AutoHitTitle.Text = BaseText .. " • ⏸ na esteira"
+            else
+                if AutoHitTitle.Text ~= BaseText then
+                    AutoHitTitle.Text = BaseText
+                end
+            end
+        end
+    end
 end)
 
 print("✅ Combat Tab Loaded")

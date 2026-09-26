@@ -51,8 +51,29 @@ RarityTitle.Font = Enum.Font.Gotham
 RarityTitle.ZIndex = 101
 RarityTitle.Parent = RarityHolder
 
--- Selected Rarities
+-- Selected Rarities (vem do config em rejoin)
 local SelectedRarities = { Secret = true, Eternal = true, Divine = true }
+pcall(function()
+    if type(_G.YOKUDO_SelectedRarities) == "table" then
+        local Fresh = { Secret = false, Eternal = false, Divine = false }
+        local Any = false
+        for _, r in ipairs(_G.YOKUDO_SelectedRarities) do
+            if Fresh[r] ~= nil then Fresh[r] = true Any = true end
+        end
+        if Any then SelectedRarities = Fresh end
+    end
+end)
+
+local function SaveFarmingConfig()
+    pcall(function()
+        local List = {}
+        if SelectedRarities.Secret then table.insert(List, "Secret") end
+        if SelectedRarities.Eternal then table.insert(List, "Eternal") end
+        if SelectedRarities.Divine then table.insert(List, "Divine") end
+        _G.YOKUDO_SelectedRarities = List
+        if _G.YOKUDO_ConfigSystem then _G.YOKUDO_ConfigSystem.Save() end
+    end)
+end
 
 local function GetSelectedText()
     local List = {}
@@ -181,6 +202,7 @@ local function CreateDropdownOption(Name, Order)
             _G.YOKUDO_FarmingManager.SetRarities(List)
         end
 
+        SaveFarmingConfig()
         print("[Farming] Rarity Toggled: " .. Name .. " = " .. tostring(SelectedRarities[Name]))
     end)
 
@@ -310,6 +332,7 @@ local function ToggleFarm()
         FarmStroke.Color = Color3.fromRGB(200, 200, 220)
         _G.YOKUDO_FarmingManager.Disable()
     end
+    SaveFarmingConfig()
 end
 
 FarmButton.MouseButton1Click:Connect(function()
@@ -358,6 +381,23 @@ task.spawn(function()
         end
     end
 end)
+
+-- Aplica raridades vindas do config (autoload/rejoin) e atualiza o dropdown
+_G.YOKUDO_ApplyFarmingRarities = function(List)
+    local Fresh = { Secret = false, Eternal = false, Divine = false }
+    local Any = false
+    if type(List) == "table" then
+        for _, r in ipairs(List) do
+            if Fresh[r] ~= nil then Fresh[r] = true Any = true end
+        end
+    end
+    if not Any then return end
+    SelectedRarities = Fresh
+    for Name, _ in pairs(OptionButtons) do
+        UpdateOptionVisual(Name)
+    end
+    DropdownBtn.Text = GetSelectedText() .. " ▼"
+end
 
 -- ==================================================
 -- REFRESH FUNCTION (សម្រាប់ ConfigSystem)

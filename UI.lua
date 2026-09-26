@@ -35,11 +35,8 @@ pcall(function()
 end)
 
 -- ==================================================
--- TOGGLE (Y icon)
+-- TOGGLE (Asthetic "A" badge — próprio, sem asset externo)
 -- ==================================================
-local ASSET_ID = Settings.AssetID
-Services.ContentProvider:PreloadAsync({ASSET_ID})
-
 local ToggleScreenGui = Instance.new("ScreenGui")
 ToggleScreenGui.Name = "ToggleGUI"
 ToggleScreenGui.ResetOnSpawn = false
@@ -47,25 +44,29 @@ ToggleScreenGui.IgnoreGuiInset = true
 ToggleScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ToggleScreenGui.Parent = GuiParent
 
-local Toggle = Instance.new("ImageButton")
-Toggle.Name = "Y"
-Toggle.Size = UDim2.new(0, 55, 0, 55)
-Toggle.Position = UDim2.new(0.02, 0, 0.5, -27.5)
-Toggle.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+local Toggle = Instance.new("TextButton")
+Toggle.Name = "A"
+Toggle.Size = UDim2.new(0, 52, 0, 52)
+Toggle.Position = UDim2.new(0.02, 0, 0.5, -26)
+Toggle.BackgroundColor3 = Color3.fromRGB(19, 20, 30)
 Toggle.BorderSizePixel = 0
-Toggle.BackgroundTransparency = 0
-Toggle.Image = ASSET_ID
+Toggle.BackgroundTransparency = 0.08
+Toggle.Text = "A"
+Toggle.TextColor3 = Color3.fromRGB(155, 140, 255)
+Toggle.TextSize = 24
+Toggle.Font = Enum.Font.MontserratBlack
+Toggle.AutoButtonColor = false
 Toggle.ZIndex = 999
 Toggle.Parent = ToggleScreenGui
 
 local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(1, 0)
+ToggleCorner.CornerRadius = UDim.new(0, 16)
 ToggleCorner.Parent = Toggle
 
 local ToggleStroke = Instance.new("UIStroke")
-ToggleStroke.Color = Color3.fromRGB(200, 200, 220)
+ToggleStroke.Color = Color3.fromRGB(135, 120, 225)
 ToggleStroke.Thickness = 1.5
-ToggleStroke.Transparency = 0.2
+ToggleStroke.Transparency = 0.35
 ToggleStroke.Parent = Toggle
 
 -- ==================================================
@@ -85,18 +86,19 @@ Main.Size = UDim2.new(0, Settings.UI.Width, 0, Settings.UI.Height)
 Main.Position = UDim2.new(0.5, -Settings.UI.Width / 2, 0.5, -Settings.UI.Height / 2)
 Main.BackgroundColor3 = Theme.Background
 Main.BorderSizePixel = 0
+Main.BackgroundTransparency = Settings.UI.Transparency or 0.06
 Main.ClipsDescendants = true
 Main.Active = true
 Main.Parent = ScreenGui
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 0)
+MainCorner.CornerRadius = UDim.new(0, 14)
 MainCorner.Parent = Main
 
 local MainBorder = Instance.new("UIStroke")
 MainBorder.Color = Color3.fromRGB(200, 200, 220)
-MainBorder.Thickness = 2
-MainBorder.Transparency = 0.1
+MainBorder.Thickness = 1.5
+MainBorder.Transparency = 0.25
 MainBorder.Parent = Main
 
 -- ==================================================
@@ -128,23 +130,47 @@ TopLine.BorderSizePixel = 0
 TopLine.ZIndex = 22
 TopLine.Parent = TopBar
 
+local LogoBadge = Instance.new("Frame")
+LogoBadge.Name = "LogoBadge"
+LogoBadge.Size = UDim2.new(0, 34, 0, 34)
+LogoBadge.Position = UDim2.new(0, 12, 0.5, -17)
+LogoBadge.BackgroundColor3 = Theme.Accent
+LogoBadge.BorderSizePixel = 0
+LogoBadge.ZIndex = 21
+LogoBadge.Parent = TopBar
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(0, 10)
+LogoCorner.Parent = LogoBadge
+
+local LogoText = Instance.new("TextLabel")
+LogoText.Name = "LogoText"
+LogoText.Size = UDim2.new(1, 0, 1, 0)
+LogoText.BackgroundTransparency = 1
+LogoText.Text = "A"
+LogoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+LogoText.TextSize = 18
+LogoText.Font = Enum.Font.MontserratBlack
+LogoText.ZIndex = 22
+LogoText.Parent = LogoBadge
+
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
-Title.Size = UDim2.new(1, -36, 0, 27)
-Title.Position = UDim2.new(0, 18, 0, 7)
+Title.Size = UDim2.new(1, -70, 0, 26)
+Title.Position = UDim2.new(0, 56, 0, 6)
 Title.BackgroundTransparency = 1
-Title.Text = Settings.Name
+Title.Text = string.upper(Settings.Name)
 Title.TextColor3 = Theme.Text
-Title.TextSize = 18
+Title.TextSize = 19
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Font = Enum.Font.GothamBold
+Title.Font = Enum.Font.MontserratBlack
 Title.ZIndex = 21
 Title.Parent = TopBar
 
 local Subtitle = Instance.new("TextLabel")
 Subtitle.Name = "Subtitle"
-Subtitle.Size = UDim2.new(1, -36, 0, 18)
-Subtitle.Position = UDim2.new(0, 18, 0, 32)
+Subtitle.Size = UDim2.new(1, -70, 0, 16)
+Subtitle.Position = UDim2.new(0, 56, 0, 32)
 Subtitle.BackgroundTransparency = 1
 Subtitle.Text = Settings.Version
 Subtitle.TextColor3 = Theme.SubText
@@ -191,14 +217,14 @@ TabScroll.ZIndex = 6
 TabScroll.Parent = Sidebar
 
 local TabPadding = Instance.new("UIPadding")
-TabPadding.PaddingTop = UDim.new(0, 6)
-TabPadding.PaddingBottom = UDim.new(0, 6)
-TabPadding.PaddingLeft = UDim.new(0, 2)
-TabPadding.PaddingRight = UDim.new(0, 2)
+TabPadding.PaddingTop = UDim.new(0, 8)
+TabPadding.PaddingBottom = UDim.new(0, 8)
+TabPadding.PaddingLeft = UDim.new(0, 7)
+TabPadding.PaddingRight = UDim.new(0, 7)
 TabPadding.Parent = TabScroll
 
 local TabList = Instance.new("UIListLayout")
-TabList.Padding = UDim.new(0, 2)
+TabList.Padding = UDim.new(0, 4)
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
 TabList.Parent = TabScroll
 
@@ -386,11 +412,11 @@ Toggle.MouseButton1Click:Connect(function()
     ScreenGui.Enabled = isUIVisible
 
     Services.TweenService:Create(Toggle, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 45, 0, 45)
+        Size = UDim2.new(0, 44, 0, 44)
     }):Play()
     task.wait(0.1)
     Services.TweenService:Create(Toggle, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 55, 0, 55)
+        Size = UDim2.new(0, 52, 0, 52)
     }):Play()
 end)
 

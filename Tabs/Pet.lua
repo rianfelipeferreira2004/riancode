@@ -86,6 +86,14 @@ local function UpdatePlaceUI(State)
     end
 end
 
+local function SavePetConfig()
+    pcall(function()
+        if _G.YOKUDO_ConfigSystem then
+            _G.YOKUDO_ConfigSystem.Save()
+        end
+    end)
+end
+
 local function TogglePlace()
     if not _G.YOKUDO_AutoPlaceEgg then return end
     local NewState = not _G.YOKUDO_AutoPlaceEgg.IsEnabled()
@@ -95,6 +103,7 @@ local function TogglePlace()
     else
         _G.YOKUDO_AutoPlaceEgg.Disable()
     end
+    SavePetConfig()
 end
 
 PlaceCheckButton.MouseButton1Click:Connect(function()
@@ -217,6 +226,7 @@ local function ToggleHatch()
     else
         _G.YOKUDO_AutoHatch.Disable()
     end
+    SavePetConfig()
 end
 
 HatchCheckButton.MouseButton1Click:Connect(function()
@@ -228,6 +238,7 @@ HatchRemoteButton.MouseButton1Click:Connect(function()
     if _G.YOKUDO_AutoHatch then
         _G.YOKUDO_AutoHatch.SetRemoteAssist(HatchRemoteOn)
     end
+    SavePetConfig()
 end)
 
 --==================================================
